@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import Anthropic from '@anthropic-ai/sdk'
 import FirecrawlApp from '@mendable/firecrawl-js'
+import { createClient } from '@supabase/supabase-js'
 
 dotenv.config()
 
@@ -23,16 +24,107 @@ const firecrawl = new FirecrawlApp({
   apiKey: process.env.FIRECRAWL_API_KEY,
 })
 
-// Firecrawl scraping function
+// Initialize Supabase client (use SERVICE_KEY for server-side operations)
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
+)
+
+// Normalize URL for matching (remove query params, trailing slashes)
+function normalizeUrl(url) {
+  try {
+    const urlObj = new URL(url)
+    return `${urlObj.origin}${urlObj.pathname}`.replace(/\/$/, '')
+  } catch {
+    return url
+  }
+}
+
+// Extract brand from URL
+function extractBrand(url) {
+  const brandMap = {
+    'lululemon.com': 'Lululemon',
+    'aloyoga.com': 'Alo Yoga',
+    'patagonia.com': 'Patagonia',
+    'vuoriclothing.com': 'Vuori',
+    'skims.com': 'Skims',
+    'athleta.gap.com': 'Athleta',
+  }
+
+  for (const [domain, brand] of Object.entries(brandMap)) {
+    if (url.includes(domain)) return brand
+  }
+  return 'Unknown'
+}
+
+// Check cache for existing product data
+async function checkCache(url) {
+  const normalizedUrl = normalizeUrl(url)
+
+  try {
+    const { data, error } = await supabase
+      .from('products_cache')
+      .select('*')
+      .or(`url.eq.${url},product_url_normalized.eq.${normalizedUrl}`)
+      .limit(1)
+      .single()
+
+    if (error || !data) {
+      console.log('[Cache] Miss - URL not found')
+      return null
+    }
+
+    console.log('[Cache] Hit - Found cached data')
+    return data
+  } catch (error) {
+    console.log('[Cache] Error checking cache:', error.message)
+    return null
+  }
+}
+
+// Save product data to cache
+async function saveToCache(url, fabricData) {
+  const normalizedUrl = normalizeUrl(url)
+  const brand = extractBrand(url)
+
+  try {
+    const { data, error } = await supabase
+      .from('products_cache')
+      .upsert({
+        url,
+        product_url_normalized: normalizedUrl,
+        brand,
+        fabrics: fabricData.fabrics || [],
+        quality_tier: fabricData.quality_tier,
+        features: fabricData.features || [],
+        scraped_at: new Date().toISOString(),
+        scrape_success: true,
+      }, {
+        onConflict: 'url'
+      })
+      .select()
+
+    if (error) {
+      console.error('[Cache] Error saving to cache:', error.message)
+    } else {
+      console.log('[Cache] Saved successfully')
+    }
+  } catch (error) {
+    console.error('[Cache] Error saving to cache:', error.message)
+  }
+}
+
+// Improved Firecrawl scraping with better error handling
 async function scrapeWithFirecrawl(url) {
   console.log(`[Firecrawl] Scraping URL: ${url}`)
 
   try {
-    // Scrape the product page with Firecrawl
+    // Enhanced scraping options for better success rate
     const scrapeResult = await firecrawl.scrape(url, {
       formats: ['markdown'],
       onlyMainContent: true,
-      waitFor: 5000,
+      waitFor: 10000, // Increased from 5s to 10s for JavaScript rendering
+      timeout: 60000, // 60 second timeout
     })
 
     if (!scrapeResult || !scrapeResult.markdown) {
@@ -43,9 +135,13 @@ async function scrapeWithFirecrawl(url) {
       }
     }
 
-    console.log('[Firecrawl] Successfully scraped page')
+    const contentLength = scrapeResult.markdown.length
+    console.log(`[Firecrawl] Success - Content length: ${contentLength} chars`)
 
-    // Return the markdown content (cleaner for Claude to parse)
+    if (contentLength < 200) {
+      console.warn('[Firecrawl] Warning: Content seems short, may be incomplete')
+    }
+
     return {
       success: true,
       content: scrapeResult.markdown,
@@ -94,7 +190,10 @@ Return ONLY the JSON object, no other text.`
       ]
     })
 
-    const responseText = message.content[0].text
+    let responseText = message.content[0].text
+
+    // Strip code fences if present (```json ... ```)
+    responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
 
     // Parse the JSON response
     const fabricData = JSON.parse(responseText)
@@ -114,22 +213,46 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: 'URL is required' })
     }
 
-    console.log(`[Analysis Started] URL: ${url}`)
+    console.log(`\n[Analysis Started] URL: ${url}`)
 
-    // Step 1: Scrape with Firecrawl
+    // Step 1: Check cache first (HYBRID SYSTEM)
+    const cachedData = await checkCache(url)
+
+    if (cachedData) {
+      console.log('[Cache] Returning cached result ⚡')
+      return res.json({
+        fabrics: cachedData.fabrics,
+        quality_tier: cachedData.quality_tier,
+        features: cachedData.features,
+        cached: true,
+        cached_at: cachedData.scraped_at
+      })
+    }
+
+    // Step 2: Not in cache - scrape with Firecrawl
+    console.log('[Cache] Not found - scraping in real-time...')
     const scrapedData = await scrapeWithFirecrawl(url)
 
     if (!scrapedData.success) {
-      return res.status(500).json({ error: 'Failed to scrape product page' })
+      return res.status(500).json({
+        error: 'Failed to scrape product page',
+        details: scrapedData.error
+      })
     }
 
-    // Step 2: Extract fabric composition with Claude
+    // Step 3: Extract fabric composition with Claude
     const fabricData = await extractFabricComposition(scrapedData.content)
 
     console.log('[Analysis Complete]', fabricData)
 
+    // Step 4: Save to cache for future lookups
+    await saveToCache(url, fabricData)
+
     // Return results
-    res.json(fabricData)
+    res.json({
+      ...fabricData,
+      cached: false
+    })
 
   } catch (error) {
     console.error('[API Error]:', error)
