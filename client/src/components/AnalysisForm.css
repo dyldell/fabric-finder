@@ -1,0 +1,112 @@
+.analysis-form-container {
+  margin-bottom: var(--space-10);
+}
+
+.analysis-form {
+  width: 100%;
+}
+
+.form-input {
+  width: 100%;
+  height: 56px;
+  padding: 0 var(--space-4);
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  margin-bottom: var(--space-4);
+}
+
+.form-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.form-input:hover {
+  border-color: var(--color-primary);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(27, 58, 45, 0.12);
+}
+
+.form-input:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.analyze-button {
+  width: 100%;
+  height: 56px;
+  background: var(--color-primary);
+  color: white;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  margin-bottom: var(--space-4);
+}
+
+.analyze-button:hover:not(:disabled) {
+  background: var(--color-primary-light);
+}
+
+.analyze-button:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.loading-container {
+  margin-bottom: var(--space-4);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 2px;
+  background: var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+.loading-message {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.form-hint {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .form-input,
+  .analyze-button {
+    font-size: 15px;
+  }
+}

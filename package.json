@@ -1,0 +1,31 @@
+{
+  "name": "fabricfinder",
+  "version": "1.0.0",
+  "description": "Find cheaper alternatives by analyzing fabric composition",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node server/index.js",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "node server/index.js"
+  },
+  "keywords": [
+    "fabric",
+    "shopping",
+    "comparison"
+  ],
+  "author": "Dylan Dell",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@mendable/firecrawl-js": "^4.15.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,50 @@
+/* Design Tokens - Editorial Luxury */
+:root {
+  /* Colors - Refined, editorial, fabric-inspired */
+  --color-bg: #F5F2ED;
+  --color-surface: #FFFFFF;
+  --color-primary: #1B3A2D;
+  --color-primary-light: #2D5A42;
+  --color-accent: #C8A96E;
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #5C5C5C;
+  --color-text-muted: #9B9B9B;
+  --color-border: #E8E3DC;
+  --color-success: #1B3A2D;
+  --color-error: #8B2E2E;
+
+  /* Typography - Editorial serif + modern sans */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* Shadows - Subtle, refined */
+  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 4px 24px rgba(0, 0, 0, 0.08);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
