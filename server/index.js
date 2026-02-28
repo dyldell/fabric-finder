@@ -118,16 +118,72 @@ async function saveToCache(url, fabricData) {
 async function scrapeWithFirecrawl(url) {
   console.log(`[Firecrawl] Scraping URL: ${url}`)
 
-  // Detect if URL needs stealth mode (anti-bot sites)
-  const needsStealth = url.includes('aloyoga.com') || url.includes('patagonia.com')
+  // Detect if URL needs special JSON extraction (Alo Yoga)
+  const useJsonExtraction = url.includes('aloyoga.com')
+  const needsStealth = useJsonExtraction || url.includes('patagonia.com')
 
   try {
-    // Enhanced scraping options for better success rate
+    // For Alo Yoga, use JSON extraction instead of markdown
+    if (useJsonExtraction) {
+      console.log(`[Firecrawl] Using JSON extraction for Alo Yoga`)
+
+      const scrapeOptions = {
+        formats: [{
+          type: 'json',
+          prompt: 'Extract the fabric composition, product name, price, and features from this product page. Look in the product details, materials section, fabric & care section.',
+          schema: {
+            type: 'object',
+            properties: {
+              product_name: { type: 'string' },
+              price: { type: 'string' },
+              fabrics: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string' },
+                    percentage: { type: 'number' }
+                  }
+                }
+              },
+              features: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            }
+          }
+        }],
+        proxy: 'stealth',
+        waitFor: 12000
+      }
+
+      const scrapeResult = await firecrawl.scrape(url, scrapeOptions)
+
+      if (!scrapeResult || !scrapeResult.json) {
+        console.error('[Firecrawl] JSON extraction failed')
+        return {
+          success: false,
+          error: 'Failed to extract product data'
+        }
+      }
+
+      console.log(`[Firecrawl] JSON extraction successful`)
+
+      // Return in format compatible with Claude extraction
+      return {
+        success: true,
+        content: null, // No markdown content needed
+        fabricData: scrapeResult.json, // Direct fabric data from JSON extraction
+        url
+      }
+    }
+
+    // Standard markdown extraction for other sites
     const scrapeOptions = {
       formats: ['markdown'],
       onlyMainContent: true,
-      waitFor: 10000, // Increased from 5s to 10s for JavaScript rendering
-      timeout: 60000, // 60 second timeout
+      waitFor: 10000,
+      timeout: 60000,
     }
 
     // Add stealth proxy for anti-bot sites
@@ -252,8 +308,18 @@ app.post('/api/analyze', async (req, res) => {
       })
     }
 
-    // Step 3: Extract fabric composition with Claude
-    const fabricData = await extractFabricComposition(scrapedData.content)
+    // Step 3: Extract fabric composition
+    let fabricData
+
+    if (scrapedData.fabricData) {
+      // JSON extraction already provided the data (Alo Yoga)
+      console.log('[Analysis] Using JSON-extracted data')
+      fabricData = scrapedData.fabricData
+    } else {
+      // Use Claude API to extract from markdown content
+      console.log('[Analysis] Extracting with Claude API')
+      fabricData = await extractFabricComposition(scrapedData.content)
+    }
 
     console.log('[Analysis Complete]', fabricData)
 
