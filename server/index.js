@@ -118,14 +118,26 @@ async function saveToCache(url, fabricData) {
 async function scrapeWithFirecrawl(url) {
   console.log(`[Firecrawl] Scraping URL: ${url}`)
 
+  // Detect if URL needs stealth mode (anti-bot sites)
+  const needsStealth = url.includes('aloyoga.com') || url.includes('patagonia.com')
+
   try {
     // Enhanced scraping options for better success rate
-    const scrapeResult = await firecrawl.scrape(url, {
+    const scrapeOptions = {
       formats: ['markdown'],
       onlyMainContent: true,
       waitFor: 10000, // Increased from 5s to 10s for JavaScript rendering
       timeout: 60000, // 60 second timeout
-    })
+    }
+
+    // Add stealth proxy for anti-bot sites
+    if (needsStealth) {
+      scrapeOptions.proxy = 'stealth'
+      scrapeOptions.mobile = true
+      console.log(`[Firecrawl] Using STEALTH mode for anti-bot protection`)
+    }
+
+    const scrapeResult = await firecrawl.scrape(url, scrapeOptions)
 
     if (!scrapeResult || !scrapeResult.markdown) {
       console.error('[Firecrawl] Scrape failed: No content returned')
