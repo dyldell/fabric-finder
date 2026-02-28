@@ -49,6 +49,16 @@ const Results = ({ data }) => {
 
         <div className="results-divider" />
 
+        {/* Trust Signal: Analysis Confidence */}
+        {data.fabrics && data.fabrics.length > 0 && (
+          <div className="confidence-badge">
+            <span className="confidence-icon">✓</span>
+            <span className="confidence-text">
+              {data.fabrics.length} {data.fabrics.length === 1 ? 'Fabric' : 'Fabrics'} Identified
+            </span>
+          </div>
+        )}
+
         {/* Fabric Composition */}
         {data.fabrics && data.fabrics.length > 0 && (
           <div className="fabric-section">
