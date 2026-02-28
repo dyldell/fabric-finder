@@ -43,26 +43,45 @@ const Results = ({ data }) => {
           <div className="fabric-section">
             <div className="section-label">FABRIC COMPOSITION</div>
 
-            <div className="fabric-list">
+            {/* Stacked Bar Chart */}
+            <div className="fabric-bar-stacked">
               {data.fabrics.map((fabric, index) => (
-                <div key={index} className="fabric-row">
-                  <div className="fabric-info">
-                    <span className="fabric-name">
-                      {fabric.type}
-                      {fabric.quality && (
-                        <span className="fabric-quality"> ({fabric.quality})</span>
-                      )}
-                    </span>
-                    <span className="fabric-percentage">{fabric.percentage}%</span>
-                  </div>
-                  <div className="fabric-bar-track">
-                    <div
-                      className={`fabric-bar-fill ${animatedFabrics.includes(index) ? 'animate' : ''}`}
-                      style={{ '--target-width': `${fabric.percentage}%` }}
-                    />
-                  </div>
+                <div
+                  key={index}
+                  className={`fabric-segment fabric-segment-${index} ${animatedFabrics.includes(index) ? 'animate' : ''}`}
+                  style={{
+                    '--target-width': `${fabric.percentage}%`,
+                    '--fabric-color': `var(--fabric-color-${index})`
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Fabric Legend */}
+            <div className="fabric-legend">
+              {data.fabrics.map((fabric, index) => (
+                <div key={index} className="fabric-legend-item">
+                  <span
+                    className="fabric-dot"
+                    style={{ backgroundColor: `var(--fabric-color-${index})` }}
+                  />
+                  <span className="fabric-legend-text">
+                    <strong>{fabric.percentage}%</strong> {fabric.type}
+                  </span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Features */}
+        {data.features && data.features.length > 0 && (
+          <div className="features-section">
+            <div className="features-box">
+              <span className="features-icon">ⓘ</span>
+              <span className="features-text">
+                Features {data.features.join(', ')}
+              </span>
             </div>
           </div>
         )}
