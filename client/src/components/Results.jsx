@@ -15,13 +15,24 @@ const Results = ({ data }) => {
     }
   }, [data])
 
-  const getAmazonSearchUrl = (fabrics, productType = 'clothing') => {
-    const fabricQuery = fabrics
-      .map(f => `${f.percentage}% ${f.type.toLowerCase()}`)
-      .join(' ')
-    const searchTerm = `${productType} ${fabricQuery}`
-    const affiliateTag = 'fabricfinder-20' // Replace with your actual tag
-    return `https://www.amazon.com/s?k=${encodeURIComponent(searchTerm)}&tag=${affiliateTag}`
+  // Use alternatives from backend if available, otherwise fallback to local generation
+  const getAlternatives = () => {
+    if (data.alternatives && data.alternatives.length > 0) {
+      return data.alternatives
+    }
+
+    // Fallback: generate basic alternatives if backend doesn't provide them
+    const fabrics = data.fabrics || []
+    const fabricQuery = fabrics.map(f => `${f.percentage}% ${f.type}`).join(' ')
+
+    return [
+      {
+        category: 'Exact Fabric Match',
+        description: `Athletic wear with ${fabricQuery}`,
+        url: `https://www.amazon.com/s?k=${encodeURIComponent(`athletic wear ${fabricQuery}`)}&tag=fabricfinder-20`,
+        estimatedSavings: '40-60%'
+      }
+    ]
   }
 
   return (
@@ -102,44 +113,28 @@ const Results = ({ data }) => {
           <h3 className="cheaper-heading">Same fabrics, lower price</h3>
           <p className="cheaper-description">
             These searches are filtered by your exact fabric composition.
+            {data.brand && ` Find alternatives to ${data.brand}.`}
           </p>
 
           <div className="amazon-links">
-            <a
-              href={getAmazonSearchUrl(data.fabrics, "women's leggings")}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="amazon-link"
-            >
-              <span className="amazon-arrow">→ Amazon</span>
-              <span className="amazon-search">
-                Women's leggings {data.fabrics.map(f => `${f.percentage}% ${f.type}`).join(' ')}
-              </span>
-            </a>
-
-            <a
-              href={getAmazonSearchUrl(data.fabrics, "athletic wear")}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="amazon-link"
-            >
-              <span className="amazon-arrow">→ Amazon</span>
-              <span className="amazon-search">
-                Athletic wear {data.fabrics.map(f => `${f.percentage}% ${f.type}`).join(' ')}
-              </span>
-            </a>
-
-            <a
-              href={getAmazonSearchUrl(data.fabrics)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="amazon-link"
-            >
-              <span className="amazon-arrow">→ Amazon</span>
-              <span className="amazon-search">
-                All products {data.fabrics.map(f => `${f.percentage}% ${f.type}`).join(' ')}
-              </span>
-            </a>
+            {getAlternatives().map((alt, index) => (
+              <a
+                key={index}
+                href={alt.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="amazon-link"
+              >
+                <div className="amazon-link-header">
+                  <span className="amazon-arrow">→</span>
+                  <span className="amazon-category">{alt.category}</span>
+                  {alt.estimatedSavings && (
+                    <span className="savings-badge">Save {alt.estimatedSavings}</span>
+                  )}
+                </div>
+                <span className="amazon-description">{alt.description}</span>
+              </a>
+            ))}
           </div>
         </div>
       )}

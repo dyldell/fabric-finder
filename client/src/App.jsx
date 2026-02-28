@@ -25,11 +25,15 @@ function App() {
         body: JSON.stringify({ url }),
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error('Failed to analyze product')
+        // Handle API error with detailed message
+        const errorMessage = data.message || data.error || 'Failed to analyze product'
+        const errorHint = data.hint ? `\n\n${data.hint}` : ''
+        throw new Error(errorMessage + errorHint)
       }
 
-      const data = await response.json()
       setResults(data)
     } catch (err) {
       setError(err.message)
@@ -60,11 +64,11 @@ function App() {
               className="error-message"
             >
               <div className="error-icon">✕</div>
-              <p>
-                {error.includes('fabric')
-                  ? "No fabric information found. Try a product page that lists materials in the description."
-                  : "We couldn't read that page. Some brands block outside tools — try copying the full product URL including https://"}
-              </p>
+              <div className="error-content">
+                {error.split('\n\n').map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))}
+              </div>
               <button
                 className="error-retry"
                 onClick={() => {

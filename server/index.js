@@ -43,12 +43,21 @@ function normalizeUrl(url) {
 // Extract brand from URL
 function extractBrand(url) {
   const brandMap = {
+    'nike.com': 'Nike',
     'lululemon.com': 'Lululemon',
+    'athleta.gap.com': 'Athleta',
+    'fabletics.com': 'Fabletics',
+    'vuoriclothing.com': 'Vuori',
     'aloyoga.com': 'Alo Yoga',
     'patagonia.com': 'Patagonia',
-    'vuoriclothing.com': 'Vuori',
     'skims.com': 'Skims',
-    'athleta.gap.com': 'Athleta',
+    'outdoorvoices.com': 'Outdoor Voices',
+    'beyondyoga.com': 'Beyond Yoga',
+    'sweatybetty.com': 'Sweaty Betty',
+    'gymshark.com': 'Gymshark',
+    'rhone.com': 'Rhone',
+    'tenthousand.cc': 'Ten Thousand',
+    'carbon38.com': 'Carbon38',
   }
 
   for (const [domain, brand] of Object.entries(brandMap)) {
@@ -118,14 +127,15 @@ async function saveToCache(url, fabricData) {
 async function scrapeWithFirecrawl(url) {
   console.log(`[Firecrawl] Scraping URL: ${url}`)
 
-  // Detect if URL needs special JSON extraction (Alo Yoga)
-  const useJsonExtraction = url.includes('aloyoga.com')
+  // Detect if URL needs special JSON extraction (Alo Yoga, Lululemon)
+  const useJsonExtraction = url.includes('aloyoga.com') || url.includes('lululemon.com')
   const needsStealth = useJsonExtraction || url.includes('patagonia.com')
 
   try {
-    // For Alo Yoga, use JSON extraction instead of markdown
+    // For Alo Yoga and Lululemon, use JSON extraction instead of markdown
     if (useJsonExtraction) {
-      console.log(`[Firecrawl] Using JSON extraction for Alo Yoga`)
+      const brand = url.includes('aloyoga.com') ? 'Alo Yoga' : 'Lululemon'
+      console.log(`[Firecrawl] Using JSON extraction for ${brand}`)
 
       const scrapeOptions = {
         formats: [{
@@ -281,6 +291,15 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: 'URL is required' })
     }
 
+    // Validate Lululemon URLs - www.lululemon.com/products/ URLs often redirect incorrectly
+    if (url.includes('www.lululemon.com/products/')) {
+      return res.status(400).json({
+        error: 'Invalid Lululemon URL format',
+        message: 'Please use shop.lululemon.com URLs instead of www.lululemon.com/products/. Example: https://shop.lululemon.com/p/women-pants/Align-Pant-2/_/prod8780551',
+        hint: 'Navigate to the product on Lululemon\'s website and copy the URL from the address bar'
+      })
+    }
+
     console.log(`\n[Analysis Started] URL: ${url}`)
 
     // Step 1: Check cache first (HYBRID SYSTEM)
@@ -288,10 +307,24 @@ app.post('/api/analyze', async (req, res) => {
 
     if (cachedData) {
       console.log('[Cache] Returning cached result ⚡')
+
+      // Generate alternatives even for cached results
+      const alternatives = generateAmazonAlternatives(
+        {
+          fabrics: cachedData.fabrics,
+          quality_tier: cachedData.quality_tier,
+          features: cachedData.features
+        },
+        cachedData.brand,
+        'athletic wear'
+      )
+
       return res.json({
         fabrics: cachedData.fabrics,
         quality_tier: cachedData.quality_tier,
         features: cachedData.features,
+        alternatives,
+        brand: cachedData.brand,
         cached: true,
         cached_at: cachedData.scraped_at
       })
@@ -326,15 +359,87 @@ app.post('/api/analyze', async (req, res) => {
     // Step 4: Save to cache for future lookups
     await saveToCache(url, fabricData)
 
+    // Step 5: Generate Amazon alternatives
+    const brand = extractBrand(url)
+    const alternatives = generateAmazonAlternatives(fabricData, brand, 'athletic wear')
+
     // Return results
     res.json({
       ...fabricData,
+      alternatives,
+      brand,
       cached: false
     })
 
   } catch (error) {
     console.error('[API Error]:', error)
     res.status(500).json({ error: error.message || 'Analysis failed' })
+  }
+})
+
+// Generate Amazon search URLs with affiliate links
+function generateAmazonAlternatives(fabricData, brand, productType = 'leggings') {
+  const associateTag = process.env.AMAZON_ASSOCIATE_TAG
+
+  if (!associateTag) {
+    console.warn('[Amazon] No associate tag configured')
+    return []
+  }
+
+  // Build search keywords based on fabric composition
+  const fabricComposition = fabricData.fabrics
+    .map(f => `${f.percentage}% ${f.type}`)
+    .join(' ')
+
+  const mainFabric = fabricData.fabrics[0]?.type || ''
+  const qualityTier = fabricData.quality_tier || 'athletic'
+
+  // Generate multiple search strategies
+  const searches = [
+    {
+      query: `${productType} ${fabricComposition}`,
+      category: 'Exact Fabric Match',
+      description: `${productType.charAt(0).toUpperCase() + productType.slice(1)} with ${fabricComposition}`
+    },
+    {
+      query: `${mainFabric} ${productType} ${qualityTier}`,
+      category: 'Main Fabric Match',
+      description: `${mainFabric} ${productType} - similar quality`
+    },
+    {
+      query: `budget ${mainFabric} ${productType}`,
+      category: 'Budget Alternative',
+      description: `Budget ${mainFabric} ${productType}`
+    }
+  ]
+
+  // Convert to Amazon affiliate links
+  return searches.map(search => ({
+    ...search,
+    url: `https://www.amazon.com/s?k=${encodeURIComponent(search.query)}&tag=${associateTag}`,
+    estimatedSavings: '40-60%' // Typical savings vs premium brands
+  }))
+}
+
+// API route to get Amazon alternatives
+app.post('/api/alternatives', async (req, res) => {
+  try {
+    const { fabrics, quality_tier, features, brand, productType } = req.body
+
+    if (!fabrics || !Array.isArray(fabrics)) {
+      return res.status(400).json({ error: 'Fabric data is required' })
+    }
+
+    const alternatives = generateAmazonAlternatives(
+      { fabrics, quality_tier, features },
+      brand,
+      productType || 'leggings'
+    )
+
+    res.json({ alternatives })
+  } catch (error) {
+    console.error('[Alternatives API Error]:', error)
+    res.status(500).json({ error: 'Failed to generate alternatives' })
   }
 })
 
