@@ -15,35 +15,35 @@ const Results = ({ data }) => {
     }
   }, [data])
 
-  // Use alternatives from backend if available, otherwise fallback to local generation
-  const getAlternatives = () => {
-    if (data.alternatives && data.alternatives.length > 0) {
-      return data.alternatives
-    }
-
-    // Fallback: generate basic alternatives if backend doesn't provide them
-    const fabrics = data.fabrics || []
-    const fabricQuery = fabrics.map(f => `${f.percentage}% ${f.type}`).join(' ')
-
-    return [
-      {
-        category: 'Exact Fabric Match',
-        description: `Athletic wear with ${fabricQuery}`,
-        url: `https://www.amazon.com/s?k=${encodeURIComponent(`athletic wear ${fabricQuery}`)}&tag=fabricfinder-20`,
-        estimatedSavings: '40-60%'
-      }
-    ]
-  }
+  // Get alternatives from backend
+  const alternatives = data.alternatives || []
 
   return (
     <div className="results-container">
       <div className="results-card">
-        {/* Product Info */}
+        {/* Product Info with Image */}
         {data.product_name && (
           <div className="product-info">
-            {data.brand && <div className="product-brand">{data.brand}</div>}
-            <h2 className="product-name">{data.product_name}</h2>
-            {data.price && <div className="product-price">{data.price}</div>}
+            {data.product_image && (
+              <div className="product-image-container">
+                <img
+                  src={data.product_image}
+                  alt={data.product_name}
+                  className="scanned-product-image"
+                  loading="eager"
+                />
+              </div>
+            )}
+            <div className="product-details">
+              {data.brand && <div className="product-brand">{data.brand}</div>}
+              <h2 className="product-name">{data.product_name}</h2>
+              {data.product_type && data.gender && (
+                <div className="product-category">
+                  {data.gender}'s {data.product_type}
+                </div>
+              )}
+              {data.price && <div className="product-price">{data.price}</div>}
+            </div>
           </div>
         )}
 
@@ -117,32 +117,60 @@ const Results = ({ data }) => {
       </div>
 
       {/* Find It Cheaper Section */}
-      {data.fabrics && data.fabrics.length > 0 && (
+      {data.fabrics && data.fabrics.length > 0 && alternatives.length > 0 && (
         <div className="cheaper-section">
-          <div className="section-label">FIND IT CHEAPER</div>
-          <h3 className="cheaper-heading">Same fabrics, lower price</h3>
+          <div className="section-label">FIND IT CHEAPER 💰</div>
+          <h3 className="cheaper-heading">Similar fabrics, better prices</h3>
           <p className="cheaper-description">
-            These searches are filtered by your exact fabric composition.
-            {data.brand && ` Find alternatives to ${data.brand}.`}
+            Real products with {data.fabrics[0]?.type || 'similar'} fabric composition.
+            {data.brand && ` Alternatives to ${data.brand}.`}
           </p>
 
-          <div className="amazon-links">
-            {getAlternatives().map((alt, index) => (
+          <div className="product-grid">
+            {alternatives.map((product, index) => (
               <a
                 key={index}
-                href={alt.url}
+                href={product.url}
                 target="_blank"
-                rel="noopener noreferrer"
-                className="amazon-link"
+                rel="noopener noreferrer nofollow"
+                className="product-card"
               >
-                <div className="amazon-link-header">
-                  <span className="amazon-arrow">→</span>
-                  <span className="amazon-category">{alt.category}</span>
-                  {alt.estimatedSavings && (
-                    <span className="savings-badge">Save {alt.estimatedSavings}</span>
+                {product.image && (
+                  <div className="product-image-wrapper">
+                    <img
+                      src={product.image}
+                      alt={product.title}
+                      className="product-image"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+
+                <div className="product-info-box">
+                  <div className="product-title">{product.title}</div>
+
+                  <div className="product-meta">
+                    {product.price && (
+                      <div className="product-price">{product.price}</div>
+                    )}
+
+                    {product.rating && (
+                      <div className="product-rating">
+                        ⭐ {product.rating} {product.reviews ? `(${product.reviews})` : ''}
+                      </div>
+                    )}
+                  </div>
+
+                  {product.source && (
+                    <div className="product-source">
+                      via {product.source}
+                    </div>
+                  )}
+
+                  {product.estimatedSavings && (
+                    <div className="savings-badge">Save {product.estimatedSavings}</div>
                   )}
                 </div>
-                <span className="amazon-description">{alt.description}</span>
               </a>
             ))}
           </div>
