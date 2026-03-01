@@ -52,6 +52,15 @@
   border-radius: var(--radius-lg);
 }
 
+/* Badges Row */
+.badges-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+}
+
 /* Trust Signal: Confidence Badge */
 .confidence-badge {
   display: inline-flex;
@@ -61,8 +70,51 @@
   background: linear-gradient(135deg, var(--color-highlight), #d4edda);
   border: 1px solid var(--color-success);
   border-radius: 20px;
-  margin-bottom: var(--space-6);
   box-shadow: 0 2px 8px rgba(15, 36, 25, 0.1);
+}
+
+/* Cache Info Badge */
+.cache-info {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+}
+
+.cache-icon {
+  font-size: 14px;
+}
+
+.cache-text {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.refresh-button {
+  margin-left: var(--space-2);
+  padding: 4px 10px;
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refresh-button:hover {
+  background: var(--color-primary);
+  transform: scale(1.05);
+}
+
+.refresh-button:active {
+  transform: scale(0.98);
 }
 
 .confidence-icon {
@@ -444,6 +496,55 @@
   flex-direction: column;
   gap: var(--space-2);
   flex: 1;
+}
+
+/* Match Badge */
+.match-badge {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  align-self: flex-start;
+  margin-bottom: var(--space-2);
+  letter-spacing: 0.02em;
+}
+
+/* Match percentage color coding */
+.match-100 {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.match-90 {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: white;
+  box-shadow: 0 2px 8px rgba(52, 211, 153, 0.3);
+}
+
+.match-80 {
+  background: linear-gradient(135deg, var(--color-highlight), #6ee7b7);
+  color: var(--color-success);
+  box-shadow: 0 2px 8px rgba(110, 231, 183, 0.2);
+}
+
+.match-70 {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #78350f;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+}
+
+.match-60 {
+  background: linear-gradient(135deg, #fcd34d, #fbbf24);
+  color: #78350f;
+  box-shadow: 0 2px 8px rgba(252, 211, 77, 0.2);
+}
+
+.match-50 {
+  background: linear-gradient(135deg, #d1d5db, #9ca3af);
+  color: #374151;
+  box-shadow: 0 2px 4px rgba(156, 163, 175, 0.2);
 }
 
 .product-title {

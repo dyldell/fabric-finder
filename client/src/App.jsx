@@ -10,11 +10,14 @@ function App() {
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [currentUrl, setCurrentUrl] = useState(null)
 
-  const handleAnalyze = async (url) => {
+  const handleAnalyze = async (url, refresh = false) => {
     setLoading(true)
     setError(null)
-    setResults(null)
+    if (!refresh) {
+      setResults(null)
+    }
 
     try {
       const response = await fetch('/api/analyze', {
@@ -22,7 +25,7 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, refresh }),
       })
 
       const data = await response.json()
@@ -35,10 +38,17 @@ function App() {
       }
 
       setResults(data)
+      setCurrentUrl(url)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRefresh = () => {
+    if (currentUrl) {
+      handleAnalyze(currentUrl, true)
     }
   }
 

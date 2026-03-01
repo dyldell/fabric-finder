@@ -147,6 +147,12 @@ const Results = ({ data }) => {
                 )}
 
                 <div className="product-info-box">
+                  {product.matchPercentage && (
+                    <div className={`match-badge match-${Math.floor(product.matchPercentage / 10) * 10}`}>
+                      {product.matchPercentage}% Match
+                    </div>
+                  )}
+
                   <div className="product-title">{product.title}</div>
 
                   <div className="product-meta">

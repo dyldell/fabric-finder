@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import FirecrawlApp from '@mendable/firecrawl-js'
 import { createClient } from '@supabase/supabase-js'
 import SerpApi from 'google-search-results-nodejs'
+import amazonPaapi from 'amazon-paapi'
 
 dotenv.config()
 
@@ -68,7 +69,12 @@ function extractBrand(url) {
 }
 
 // Check cache for existing product data
-async function checkCache(url) {
+async function checkCache(url, forceRefresh = false) {
+  if (forceRefresh) {
+    console.log('[Cache] Force refresh requested - skipping cache')
+    return null
+  }
+
   const normalizedUrl = normalizeUrl(url)
 
   try {
@@ -84,7 +90,24 @@ async function checkCache(url) {
       return null
     }
 
-    console.log('[Cache] Hit - Found cached data')
+    // Check if cache has expired (7 days default)
+    const expiresAt = new Date(data.expires_at)
+    const now = new Date()
+
+    if (expiresAt < now) {
+      console.log('[Cache] Expired - Last cached:', data.scraped_at)
+      return null
+    }
+
+    // Update cache hit counter
+    await supabase
+      .from('products_cache')
+      .update({ cache_hits: (data.cache_hits || 0) + 1 })
+      .eq('id', data.id)
+
+    const cacheAge = Math.floor((now - new Date(data.scraped_at)) / (1000 * 60 * 60 * 24))
+    console.log(`[Cache] Hit - Cached ${cacheAge} days ago (${data.cache_hits || 0} hits)`)
+
     return data
   } catch (error) {
     console.log('[Cache] Error checking cache:', error.message)
@@ -96,6 +119,10 @@ async function checkCache(url) {
 async function saveToCache(url, fabricData) {
   const normalizedUrl = normalizeUrl(url)
   const brand = extractBrand(url)
+
+  // Set expiration: 7 days for product data (prices change)
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
   try {
     const { data, error } = await supabase
@@ -112,7 +139,9 @@ async function saveToCache(url, fabricData) {
         quality_tier: fabricData.quality_tier,
         features: fabricData.features || [],
         scraped_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(),
         scrape_success: true,
+        cache_hits: 0
       }, {
         onConflict: 'url'
       })
@@ -308,7 +337,7 @@ Return ONLY the JSON object, no other text.`
 // API Routes
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { url } = req.body
+    const { url, refresh } = req.body
 
     if (!url) {
       return res.status(400).json({ error: 'URL is required' })
@@ -323,44 +352,45 @@ app.post('/api/analyze', async (req, res) => {
       })
     }
 
-    console.log(`\n[Analysis Started] URL: ${url}`)
+    console.log(`\n[Analysis Started] URL: ${url}${refresh ? ' (FORCE REFRESH)' : ''}`)
 
+    // CACHE DISABLED FOR TESTING - Re-enable later
     // Step 1: Check cache first (HYBRID SYSTEM)
-    const cachedData = await checkCache(url)
+    // const cachedData = await checkCache(url, refresh === true)
+    //
+    // if (cachedData) {
+    //   console.log('[Cache] Returning cached result ⚡')
+    //
+    //   // Generate alternatives even for cached results
+    //   const alternatives = await searchProductAlternatives(
+    //     {
+    //       fabrics: cachedData.fabrics,
+    //       quality_tier: cachedData.quality_tier,
+    //       features: cachedData.features,
+    //       product_type: cachedData.product_type,
+    //       gender: cachedData.gender
+    //     },
+    //     cachedData.brand,
+    //     cachedData.product_type || 'athletic wear'
+    //   )
+    //
+    //   return res.json({
+    //     product_name: cachedData.product_name,
+    //     product_type: cachedData.product_type,
+    //     gender: cachedData.gender,
+    //     product_image: cachedData.product_image,
+    //     fabrics: cachedData.fabrics,
+    //     quality_tier: cachedData.quality_tier,
+    //     features: cachedData.features,
+    //     alternatives,
+    //     brand: cachedData.brand,
+    //     cached: true,
+    //     cached_at: cachedData.scraped_at
+    //   })
+    // }
 
-    if (cachedData) {
-      console.log('[Cache] Returning cached result ⚡')
-
-      // Generate alternatives even for cached results
-      const alternatives = await searchProductAlternatives(
-        {
-          fabrics: cachedData.fabrics,
-          quality_tier: cachedData.quality_tier,
-          features: cachedData.features,
-          product_type: cachedData.product_type,
-          gender: cachedData.gender
-        },
-        cachedData.brand,
-        cachedData.product_type || 'athletic wear'
-      )
-
-      return res.json({
-        product_name: cachedData.product_name,
-        product_type: cachedData.product_type,
-        gender: cachedData.gender,
-        product_image: cachedData.product_image,
-        fabrics: cachedData.fabrics,
-        quality_tier: cachedData.quality_tier,
-        features: cachedData.features,
-        alternatives,
-        brand: cachedData.brand,
-        cached: true,
-        cached_at: cachedData.scraped_at
-      })
-    }
-
-    // Step 2: Not in cache - scrape with Firecrawl
-    console.log('[Cache] Not found - scraping in real-time...')
+    // Step 2: Scrape with Firecrawl (cache disabled)
+    console.log('[Scraping] Fresh scrape - cache disabled for testing')
     const scrapedData = await scrapeWithFirecrawl(url)
 
     if (!scrapedData.success) {
@@ -385,8 +415,9 @@ app.post('/api/analyze', async (req, res) => {
 
     console.log('[Analysis Complete]', fabricData)
 
+    // CACHE DISABLED FOR TESTING - Re-enable later
     // Step 4: Save to cache for future lookups
-    await saveToCache(url, fabricData)
+    // await saveToCache(url, fabricData)
 
     // Step 5: Search for real product alternatives
     const brand = extractBrand(url)
@@ -410,54 +441,57 @@ app.post('/api/analyze', async (req, res) => {
   }
 })
 
-// Search for real product alternatives using SerpAPI
-async function searchProductAlternatives(fabricData, brand, productType = 'athletic wear') {
+// Search for real product alternatives using SerpAPI (keep for Google Shopping results)
+async function searchSerpApiProducts(fabricData, brand, productType = 'athletic wear', customQuery = null) {
   const serpApiKey = process.env.SERP_API_KEY
   const associateTag = process.env.AMAZON_ASSOCIATE_TAG
 
   if (!serpApiKey) {
     console.warn('[SerpAPI] No API key configured - using fallback')
-    return generateFallbackAlternatives(fabricData, brand, productType)
+    return []
   }
 
   try {
-    // Build search query based on product type, gender, and fabric composition
-    const mainFabric = fabricData.fabrics[0]?.type || 'synthetic'
-    const secondaryFabric = fabricData.fabrics[1]?.type || ''
-
-    // Use extracted product type and gender, or fall back to generic
-    const gender = fabricData.gender || ''
-    let type = fabricData.product_type || productType
-
-    // Expand product type aliases for better search results
-    const typeExpansions = {
-      'tee': 't-shirt',
-      'top': 'shirt',
-      'pant': 'pants',
-      'tight': 'leggings'
-    }
-    const expandedType = typeExpansions[type] || type
-
-    // Create smart search query with gender + expanded type
     let searchQuery = ''
-    if (gender && expandedType) {
-      // "mens t-shirt polyester spandex"
-      searchQuery = secondaryFabric
-        ? `${gender} ${expandedType} ${mainFabric} ${secondaryFabric}`
-        : `${gender} ${expandedType} ${mainFabric}`
-    } else if (expandedType) {
-      // "t-shirt polyester spandex"
-      searchQuery = secondaryFabric
-        ? `${expandedType} ${mainFabric} ${secondaryFabric}`
-        : `${expandedType} ${mainFabric}`
+
+    // Use custom query if provided (for multi-query strategy)
+    if (customQuery) {
+      searchQuery = customQuery
     } else {
-      // fallback to generic
-      searchQuery = secondaryFabric
-        ? `${mainFabric} ${secondaryFabric} athletic wear`
-        : `${mainFabric} athletic wear`
+      // Build default search query based on product type, gender, and fabric composition
+      const mainFabric = fabricData.fabrics[0]?.type || 'synthetic'
+      const secondaryFabric = fabricData.fabrics[1]?.type || ''
+
+      // Use extracted product type and gender, or fall back to generic
+      const gender = fabricData.gender || ''
+      let type = fabricData.product_type || productType
+
+      // Expand product type aliases for better search results
+      const typeExpansions = {
+        'tee': 't-shirt',
+        'top': 'shirt',
+        'pant': 'pants',
+        'tight': 'leggings'
+      }
+      const expandedType = typeExpansions[type] || type
+
+      // Create smart search query with gender + expanded type
+      if (gender && expandedType) {
+        searchQuery = secondaryFabric
+          ? `${gender} ${expandedType} ${mainFabric} ${secondaryFabric}`
+          : `${gender} ${expandedType} ${mainFabric}`
+      } else if (expandedType) {
+        searchQuery = secondaryFabric
+          ? `${expandedType} ${mainFabric} ${secondaryFabric}`
+          : `${expandedType} ${mainFabric}`
+      } else {
+        searchQuery = secondaryFabric
+          ? `${mainFabric} ${secondaryFabric} athletic wear`
+          : `${mainFabric} athletic wear`
+      }
     }
 
-    console.log(`[SerpAPI] Searching for: "${searchQuery}" (type: ${type})`)
+    console.log(`[SerpAPI] Searching: "${searchQuery}"`)
 
     // Call SerpAPI Google Shopping
     const search = new SerpApi.GoogleSearch(serpApiKey)
@@ -466,7 +500,7 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
       search.json({
         engine: 'google_shopping',
         q: searchQuery,
-        num: 6, // Get top 6 results
+        num: 10, // Get top 10 results per query
         gl: 'us', // United States
         hl: 'en', // English
       }, (data) => {
@@ -498,8 +532,8 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
       'hoodie': ['legging', 'pant', 'short', 'jogger', 'tight']
     }
 
-    const productType = fabricData.product_type || productType
-    const exclusions = typeExclusions[productType] || []
+    const currentProductType = fabricData.product_type || productType
+    const exclusions = typeExclusions[currentProductType] || []
 
     if (exclusions.length > 0) {
       filteredResults = results.shopping_results.filter(product => {
@@ -509,8 +543,8 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
       console.log(`[SerpAPI] Filtered ${results.shopping_results.length} → ${filteredResults.length} products (excluded: ${exclusions.join(', ')})`)
     }
 
-    // Transform SerpAPI results into our format (get top 6 after filtering)
-    return filteredResults.slice(0, 6).map(product => {
+    // Transform SerpAPI results into our format (get top 10 after filtering)
+    return filteredResults.slice(0, 10).map(product => {
       // Add Amazon affiliate tag if it's an Amazon product
       let productUrl = product.product_link || product.link || '#'
       if (productUrl && productUrl.includes('amazon.com') && associateTag) {
@@ -542,7 +576,368 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   }
 }
 
-// Fallback: Generate basic Amazon search links if SerpAPI fails
+// Search Amazon directly using SerpAPI (no Creator API needed!)
+async function searchAmazonViaSerpApi(fabricData, brand, productType = 'athletic wear', customQuery = null) {
+  const serpApiKey = process.env.SERP_API_KEY
+  const associateTag = process.env.AMAZON_ASSOCIATE_TAG || 'fabricfinder-20'
+
+  if (!serpApiKey) {
+    console.warn('[SerpAPI Amazon] No API key configured')
+    return []
+  }
+
+  try {
+    // Use custom query or build from fabric data
+    const searchQuery = customQuery || (() => {
+      const gender = fabricData.gender || ''
+      const type = fabricData.product_type || productType
+      const fabricString = fabricData.fabrics
+        .map(f => `${f.percentage}% ${f.type}`)
+        .join(' ')
+
+      return gender && type
+        ? `${gender} ${type} ${fabricString}`
+        : `${type} ${fabricString}`
+    })()
+
+    console.log(`[SerpAPI Amazon] Searching: "${searchQuery}"`)
+
+    const search = new SerpApi.GoogleSearch(serpApiKey)
+
+    const results = await new Promise((resolve, reject) => {
+      search.json({
+        engine: 'amazon',
+        amazon_domain: 'amazon.com',
+        k: searchQuery,
+        page: 1
+      }, (data) => {
+        resolve(data)
+      })
+    })
+
+    if (!results.organic_results || results.organic_results.length === 0) {
+      console.warn('[SerpAPI Amazon] No results found')
+      return []
+    }
+
+    console.log(`[SerpAPI Amazon] Found ${results.organic_results.length} Amazon products`)
+
+    // Transform Amazon results
+    return results.organic_results.slice(0, 10).map(product => {
+      // Add affiliate tag to Amazon URL
+      let productUrl = product.link || '#'
+      if (productUrl.includes('amazon.com')) {
+        try {
+          const urlObj = new URL(productUrl)
+          urlObj.searchParams.set('tag', associateTag)
+          productUrl = urlObj.toString()
+        } catch (e) {
+          console.warn('[SerpAPI Amazon] Invalid URL:', productUrl)
+        }
+      }
+
+      return {
+        title: product.title || 'Amazon Product',
+        price: product.price || 'Price not available',
+        originalPrice: null,
+        image: product.thumbnail || null,
+        url: productUrl,
+        source: 'Amazon',
+        rating: product.rating || null,
+        reviews: product.reviews || null,
+        asin: product.asin || null
+      }
+    })
+
+  } catch (error) {
+    console.error('[SerpAPI Amazon Error]:', error.message)
+    return []
+  }
+}
+
+// MAIN FUNCTION: Combine Amazon + Multi-Query SerpAPI and rank with Claude
+async function searchProductAlternatives(fabricData, brand, productType = 'athletic wear') {
+  console.log('[Search] Starting multi-query search strategy')
+
+  const gender = fabricData.gender || ''
+  const type = fabricData.product_type || productType
+
+  // Build fabric string with percentages (e.g., "96% Polyester 4% Elastane")
+  const fabricString = fabricData.fabrics
+    .map(f => `${f.percentage}% ${f.type}`)
+    .join(' ')
+
+  // Build 3 different search queries to maximize coverage
+  const queries = []
+
+  // Query 1: Budget-focused (likely to find Amazon)
+  queries.push({
+    name: 'budget',
+    query: gender && type
+      ? `budget ${gender} ${type} ${fabricString}`
+      : `budget ${type} ${fabricString}`
+  })
+
+  // Query 2: Exact match (current strategy)
+  queries.push({
+    name: 'exact',
+    query: gender && type
+      ? `${gender} ${type} ${fabricString}`
+      : `${type} ${fabricString}`
+  })
+
+  // Query 3: Value/affordable (catches different retailers)
+  queries.push({
+    name: 'affordable',
+    query: gender && type
+      ? `affordable ${gender} ${type} ${fabricString}`
+      : `affordable ${type} ${fabricString}`
+  })
+
+  console.log(`[Search] Running searches: Amazon direct + Google Shopping (3 queries each)`)
+
+  // Run all queries in parallel: Amazon PAAPI, Amazon SerpAPI (2 queries), Google Shopping SerpAPI (3 queries)
+  const [amazonPaapiResults, amazonSerpExact, amazonSerpBudget, ...googleShoppingResults] = await Promise.all([
+    searchAmazonProducts(fabricData, brand, productType),
+    searchAmazonViaSerpApi(fabricData, brand, productType, queries.find(q => q.name === 'exact').query),
+    searchAmazonViaSerpApi(fabricData, brand, productType, queries.find(q => q.name === 'budget').query),
+    ...queries.map(q => searchSerpApiProducts(fabricData, brand, productType, q.query))
+  ])
+
+  // Combine all Amazon results (PAAPI + SerpAPI)
+  const allAmazonResults = [...amazonPaapiResults, ...amazonSerpExact, ...amazonSerpBudget]
+
+  // Flatten Google Shopping results
+  const allGoogleShoppingResults = googleShoppingResults.flat()
+
+  // Combine everything
+  const allResults = [...allAmazonResults, ...allGoogleShoppingResults]
+
+  // Deduplicate by URL AND title similarity (catch variants of same product)
+  const seenUrls = new Set()
+  const seenTitles = new Map() // title -> product
+  const deduplicatedResults = allResults.filter(product => {
+    // Skip if exact URL match
+    if (seenUrls.has(product.url)) return false
+
+    // Check for similar titles (same source + similar title = duplicate)
+    const titleKey = `${product.source}:${product.title?.substring(0, 30)}`
+    if (seenTitles.has(titleKey)) return false
+
+    seenUrls.add(product.url)
+    seenTitles.set(titleKey, product)
+    return true
+  })
+
+  // Use deduplicated results
+  let allProducts = deduplicatedResults
+
+  if (allProducts.length === 0) {
+    console.warn('[Search] No results from any source - using fallback')
+    return generateFallbackAlternatives(fabricData, brand, productType)
+  }
+
+  console.log(`[Search] Found ${allAmazonResults.length} Amazon + ${allGoogleShoppingResults.length} Google Shopping = ${allResults.length} total → ${allProducts.length} unique products after deduplication`)
+
+  // Use Claude to score and rank all products by fabric match
+  let rankedProducts = await scoreAndRankProducts(
+    fabricData.fabrics,
+    allProducts,
+    fabricData.product_type || productType
+  )
+
+  // Sort by match percentage ONLY (highest first)
+  rankedProducts.sort((a, b) => b.matchPercentage - a.matchPercentage)
+
+  console.log(`[Search] Sorted by fabric match % only`)
+
+  // Log final top 10 (sorted by fabric match % only)
+  console.log('\n[Final Top 10 - By Fabric Match]:')
+  rankedProducts.slice(0, 10).forEach((p, i) => {
+    console.log(`${i + 1}. [${p.matchPercentage}%] ${p.price} - ${p.title.substring(0, 60)}... (${p.source})`)
+  })
+  console.log('')
+
+  // Return top 10 products
+  return rankedProducts.slice(0, 10)
+}
+
+// Helper: Extract numeric price from string
+function extractPrice(priceString) {
+  if (!priceString || typeof priceString !== 'string') return 999999
+  const match = priceString.match(/[\d,]+\.?\d*/);
+  if (!match) return 999999
+  return parseFloat(match[0].replace(/,/g, ''))
+}
+
+// Search Amazon using Product Advertising API
+async function searchAmazonProducts(fabricData, brand, productType = 'athletic wear') {
+  const accessKey = process.env.AMAZON_ACCESS_KEY
+  const secretKey = process.env.AMAZON_SECRET_KEY
+  const associateTag = process.env.AMAZON_ASSOCIATE_TAG
+
+  if (!accessKey || !secretKey || !associateTag) {
+    console.warn('[Amazon PAAPI] API credentials not configured')
+    return []
+  }
+
+  try {
+    // Build search keywords
+    const gender = fabricData.gender || ''
+    const type = fabricData.product_type || productType
+    const mainFabric = fabricData.fabrics[0]?.type || ''
+
+    const searchKeywords = gender && type
+      ? `${gender} ${type} ${mainFabric}`
+      : `${type} ${mainFabric}`
+
+    console.log(`[Amazon PAAPI] Searching for: "${searchKeywords}"`)
+
+    const requestParameters = {
+      Keywords: searchKeywords,
+      SearchIndex: 'Fashion',
+      ItemCount: 10,
+      Resources: [
+        'Images.Primary.Large',
+        'ItemInfo.Title',
+        'ItemInfo.Features',
+        'Offers.Listings.Price',
+        'Offers.Listings.SavingBasis'
+      ]
+    }
+
+    const commonParameters = {
+      AccessKey: accessKey,
+      SecretKey: secretKey,
+      PartnerTag: associateTag,
+      PartnerType: 'Associates',
+      Marketplace: 'www.amazon.com'
+    }
+
+    const data = await amazonPaapi.SearchItems(commonParameters, requestParameters)
+
+    if (!data.SearchResult || !data.SearchResult.Items) {
+      console.warn('[Amazon PAAPI] No items found')
+      return []
+    }
+
+    console.log(`[Amazon PAAPI] Found ${data.SearchResult.Items.length} products`)
+
+    // Transform Amazon results
+    return data.SearchResult.Items.map(item => {
+      const price = item.Offers?.Listings?.[0]?.Price?.DisplayAmount || null
+      const image = item.Images?.Primary?.Large?.URL || null
+
+      return {
+        title: item.ItemInfo?.Title?.DisplayValue || 'Amazon Product',
+        price: price,
+        originalPrice: null,
+        image: image,
+        url: item.DetailPageURL || '#',
+        source: 'Amazon',
+        rating: null,
+        reviews: null,
+        delivery: null,
+        asin: item.ASIN,
+        features: item.ItemInfo?.Features?.DisplayValues || []
+      }
+    })
+
+  } catch (error) {
+    console.error('[Amazon PAAPI Error]:', error.message)
+    return []
+  }
+}
+
+// Use Claude to calculate match percentage and rank results
+async function scoreAndRankProducts(originalFabrics, products, productType) {
+  if (products.length === 0) return []
+
+  try {
+    // Build fabric comparison prompt
+    const originalFabricString = originalFabrics
+      .map(f => `${f.percentage}% ${f.type}`)
+      .join(', ')
+
+    const productsJson = JSON.stringify(products.map((p, idx) => ({
+      index: idx,
+      title: p.title,
+      source: p.source,
+      features: p.features || []
+    })))
+
+    const prompt = `You are a fabric matching expert. The user is looking for products similar to one with this fabric composition:
+"${originalFabricString}"
+
+Product type: ${productType}
+
+Here are candidate products to rank:
+${productsJson}
+
+For each product, analyze the title and features to estimate the fabric composition match percentage:
+- 100% = Exact same fabrics and percentages
+- 90-99% = Same fabrics, slightly different percentages
+- 80-89% = Same main fabric, different secondary fabrics
+- 70-79% = Similar fabric type (e.g., polyester vs nylon)
+- 60-69% = Same product type but different fabric family
+- <60% = Poor match
+
+Return ONLY a JSON array with this structure:
+[
+  {"index": 0, "matchPercentage": 95, "reason": "Likely 87% Polyester, 13% Spandex based on title"},
+  {"index": 1, "matchPercentage": 75, "reason": "Similar synthetic blend"}
+]`
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    })
+
+    let responseText = message.content[0].text
+    responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+
+    const scores = JSON.parse(responseText)
+
+    // Add match data to products and sort by match percentage
+    const scoredProducts = products.map((product, idx) => {
+      const score = scores.find(s => s.index === idx)
+      return {
+        ...product,
+        matchPercentage: score?.matchPercentage || 50,
+        matchReason: score?.reason || 'Unable to determine match'
+      }
+    })
+
+    // Sort by match percentage (highest first)
+    scoredProducts.sort((a, b) => b.matchPercentage - a.matchPercentage)
+
+    console.log(`[Claude Matching] Scored and ranked ${scoredProducts.length} products`)
+
+    // Log top 15 products for debugging
+    console.log('\n[Top 15 Products After Scoring]:')
+    scoredProducts.slice(0, 15).forEach((p, i) => {
+      console.log(`${i + 1}. [${p.matchPercentage}%] ${p.title.substring(0, 80)}... (${p.source})`)
+    })
+    console.log('')
+
+    return scoredProducts
+
+  } catch (error) {
+    console.error('[Claude Matching Error]:', error.message)
+    // Return products with default 50% match if scoring fails
+    return products.map(p => ({
+      ...p,
+      matchPercentage: 50,
+      matchReason: 'Match scoring unavailable'
+    }))
+  }
+}
+
+// Fallback: Generate basic Amazon search links if both APIs fail
 function generateFallbackAlternatives(fabricData, brand, productType = 'athletic wear') {
   const associateTag = process.env.AMAZON_ASSOCIATE_TAG || 'fabricfinder-20'
 
@@ -559,7 +954,8 @@ function generateFallbackAlternatives(fabricData, brand, productType = 'athletic
       url: `https://www.amazon.com/s?k=${encodeURIComponent(`${productType} ${fabricComposition}`)}&tag=${associateTag}`,
       image: null,
       source: 'Amazon Search',
-      estimatedSavings: '40-60%'
+      matchPercentage: 75,
+      matchReason: 'Generic fabric search'
     },
     {
       title: `Budget ${mainFabric} ${productType}`,
@@ -567,7 +963,8 @@ function generateFallbackAlternatives(fabricData, brand, productType = 'athletic
       url: `https://www.amazon.com/s?k=${encodeURIComponent(`budget ${mainFabric} ${productType}`)}&tag=${associateTag}`,
       image: null,
       source: 'Amazon Search',
-      estimatedSavings: '50-70%'
+      matchPercentage: 65,
+      matchReason: 'Budget alternative search'
     }
   ]
 }
