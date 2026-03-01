@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FABRIC FINDER / API OPS</title>
+  <style>
+    /* ============================================
+       DESIGN TOKENS - Apple-Inspired Dark Theme
+       ============================================ */
+    :root {
+      /* Pure Black Background (Apple Style) */
+      --color-bg: #000000;
+      --color-surface: #1a1a1a;
+      --color-surface-secondary: #111111;
+      --color-surface-tertiary: #0a0a0a;
+
+      /* Neon Accents (10% rule - use sparingly) */
+      --color-claude: #00F5FF;
+      --color-serpapi: #FF6B00;
+      --color-firecrawl: #BF5FFF;
+      --color-supabase: #39FF14;
+      --color-success: #39FF14;
+      --color-warning: #FF2D78;
+      --color-error: #FF2D78;
+
+      /* Typography */
+      --color-text-primary: #FFFFFF;
+      --color-text-secondary: #999999;
+      --color-text-tertiary: #666666;
+
+      /* Spacing (8-point grid) */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-10: 40px;
+      --space-12: 48px;
+      --space-16: 64px;
+      --space-20: 80px;
+
+      /* Typography Scale */
+      --font-system: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+
+      /* Shadows & Depth */
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+      --shadow-md: 0 4px 8px rgba(0,0,0,0.6);
+      --shadow-lg: 0 10px 20px rgba(0,0,0,0.7);
+      --shadow-glow-green: 0 0 20px rgba(57, 255, 20, 0.3);
+      --shadow-glow-blue: 0 0 20px rgba(0, 245, 255, 0.3);
+      --shadow-glow-orange: 0 0 20px rgba(255, 107, 0, 0.3);
+      --shadow-glow-purple: 0 0 20px rgba(191, 95, 255, 0.3);
+
+      /* Border Radius */
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+    }
+
+    /* ============================================
+       GLOBAL RESETS & BASE STYLES
+       ============================================ */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      font-family: var(--font-system);
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    ::selection {
+      background: var(--color-claude);
+      color: var(--color-bg);
+    }
+
+    /* ============================================
+       LAYOUT STRUCTURE
+       ============================================ */
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: var(--space-8);
+    }
+
+    /* ============================================
+       HERO HEADER
+       ============================================ */
+    .hero {
+      padding: var(--space-16) 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    /* Thin neon line separator */
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent,
+        var(--color-success) 20%,
+        var(--color-claude) 50%,
+        var(--color-firecrawl) 80%,
+        transparent
+      );
+      opacity: 0.4;
+    }
+
+    .hero-title {
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: var(--space-2);
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: var(--space-8);
+    }
+
+    .hero-meta {
+      display: flex;
+      gap: var(--space-6);
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+
+    .hero-clock {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--color-text-tertiary);
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: var(--space-10);
+      margin-top: var(--space-8);
+    }
+
+    .hero-stat {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    .hero-stat-label {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 500;
+    }
+
+    .hero-stat-value {
+      font-size: clamp(48px, 6vw, 72px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    .hero-stat-value.success {
+      color: var(--color-success);
+      text-shadow: var(--shadow-glow-green);
+    }
+
+    /* Number count-up animation */
+    @keyframes count-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-stat-value {
+      animation: count-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+    }
+
+    /* ============================================
+       API CARDS GRID
+       ============================================ */
+    .api-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: var(--space-6);
+      margin: var(--space-12) 0;
+    }
+
+    .api-card {
+      background: var(--color-surface);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Rim lighting (Apple button effect) */
+    .api-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2) 50%, transparent);
+      pointer-events: none;
+    }
+
+    /* Noise texture overlay (2% opacity) */
+    .api-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .api-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    /* API-specific accent colors */
+    .api-card.claude { border-left: 2px solid var(--color-claude); }
+    .api-card.serpapi { border-left: 2px solid var(--color-serpapi); }
+    .api-card.firecrawl { border-left: 2px solid var(--color-firecrawl); }
+    .api-card.supabase { border-left: 2px solid var(--color-supabase); }
+
+    .api-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-6);
+    }
+
+    .api-card-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .api-status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    /* Pulsing green status indicator */
+    .api-status-dot.active {
+      background: var(--color-success);
+      box-shadow: 0 0 10px var(--color-success);
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .api-status-dot.error {
+      background: var(--color-error);
+    }
+
+    .api-status-dot.warning {
+      background: var(--color-warning);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.1); }
+    }
+
+    .api-badge {
+      display: inline-block;
+      padding: var(--space-1) var(--space-2);
+      background: var(--color-warning);
+      color: var(--color-bg);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: var(--radius-sm);
+      margin-top: var(--space-2);
+    }
+
+    .api-metrics {
+      display: grid;
+      gap: var(--space-4);
+    }
+
+    .api-metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .api-metric-label {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .api-metric-value {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .api-metric-value.claude { color: var(--color-claude); }
+    .api-metric-value.serpapi { color: var(--color-serpapi); }
+    .api-metric-value.firecrawl { color: var(--color-firecrawl); }
+    .api-metric-value.supabase { color: var(--color-success); }
+
+    .api-usage-bar {
+      margin-top: var(--space-4);
+      height: 4px;
+      background: var(--color-surface-secondary);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .api-usage-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-success), var(--color-warning), var(--color-error));
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .api-usage-fill::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: shimmer 2s linear infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .api-last-call {
+      margin-top: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-text-tertiary);
+    }
+
+    /* ============================================
+       COST BREAKDOWN SECTION
+       ============================================ */
+    .cost-section {
+      margin: var(--space-16) 0;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: var(--space-6);
+      text-transform: uppercase;
+      color: var(--color-text-secondary);
+    }
+
+    .cost-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--space-6);
+      margin-bottom: var(--space-8);
+    }
+
+    .cost-card {
+      background: var(--color-surface);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+    }
+
+    .cost-label {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-2);
+    }
+
+    .cost-value {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--color-success);
+    }
+
+    /* ============================================
+       SCAN HISTORY TABLE
+       ============================================ */
+    .history-section {
+      margin: var(--space-16) 0;
+    }
+
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .history-table thead th {
+      text-align: left;
+      padding: var(--space-4);
+      color: var(--color-text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .history-table tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      transition: background 0.2s ease;
+    }
+
+    .history-table tbody tr:nth-child(odd) {
+      background: var(--color-surface-tertiary);
+    }
+
+    .history-table tbody tr:nth-child(even) {
+      background: var(--color-surface-secondary);
+    }
+
+    .history-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .history-table tbody td {
+      padding: var(--space-4);
+      color: var(--color-text-primary);
+    }
+
+    .history-table .url-cell {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .history-table .time-cell {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--color-text-tertiary);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-badge.success {
+      background: rgba(57, 255, 20, 0.1);
+      color: var(--color-success);
+      border: 1px solid var(--color-success);
+    }
+
+    .status-badge.error {
+      background: rgba(255, 45, 120, 0.1);
+      color: var(--color-error);
+      border: 1px solid var(--color-error);
+    }
+
+    .status-badge.cached {
+      background: rgba(0, 245, 255, 0.1);
+      color: var(--color-claude);
+      border: 1px solid var(--color-claude);
+    }
+
+    /* ============================================
+       SYSTEM STATUS BAR (Footer)
+       ============================================ */
+    .status-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--color-surface);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding: var(--space-4) var(--space-8);
+      display: flex;
+      gap: var(--space-4);
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
+      background: var(--color-surface-secondary);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-pill-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-success);
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* ============================================
+       UTILITIES
+       ============================================ */
+    .fade-in {
+      animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .stagger-1 { animation-delay: 0.1s; }
+    .stagger-2 { animation-delay: 0.2s; }
+    .stagger-3 { animation-delay: 0.3s; }
+    .stagger-4 { animation-delay: 0.4s; }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: var(--space-20) var(--space-8);
+      color: var(--color-text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: var(--space-6);
+      opacity: 0.3;
+    }
+
+    .empty-state-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: var(--space-4);
+      color: var(--color-text-primary);
+    }
+
+    .empty-state-text {
+      font-size: 16px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    /* Refresh Button */
+    .refresh-button {
+      position: fixed;
+      top: var(--space-8);
+      right: var(--space-8);
+      width: 48px;
+      height: 48px;
+      background: var(--color-surface);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 100;
+    }
+
+    .refresh-button:hover {
+      background: var(--color-success);
+      box-shadow: var(--shadow-glow-green);
+      transform: scale(1.1) rotate(90deg);
+    }
+
+    .refresh-button:active {
+      transform: scale(0.95) rotate(180deg);
+    }
+
+    .refresh-icon {
+      width: 24px;
+      height: 24px;
+      color: var(--color-text-primary);
+    }
+
+    /* Loading Spinner */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--color-success);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero-stats {
+        flex-direction: column;
+        gap: var(--space-6);
+      }
+
+      .api-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cost-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .history-table {
+        font-size: 12px;
+      }
+
+      .history-table .url-cell {
+        max-width: 150px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Refresh Button -->
+  <button class="refresh-button" onclick="loadDashboardData()" title="Refresh Data">
+    <svg class="refresh-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+    </svg>
+  </button>
+
+  <div class="container">
+    <!-- Hero Header -->
+    <header class="hero">
+      <h1 class="hero-title">FABRIC FINDER / API OPS</h1>
+      <p class="hero-subtitle">Live Infrastructure Monitor</p>
+      <div class="hero-meta">
+        <span class="hero-clock" id="live-clock">—</span>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <span class="hero-stat-label">Total Scans Today</span>
+          <span class="hero-stat-value" id="total-scans-today">0</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-label">Estimated Cost Today</span>
+          <span class="hero-stat-value success" id="total-cost-today">$0.00</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- API Cards Grid -->
+    <section class="api-grid" id="api-cards">
+      <!-- Will be populated by JavaScript -->
+    </section>
+
+    <!-- Cost Breakdown -->
+    <section class="cost-section">
+      <h2 class="section-title">Cost Breakdown</h2>
+      <div class="cost-grid" id="cost-breakdown">
+        <!-- Will be populated by JavaScript -->
+      </div>
+    </section>
+
+    <!-- Scan History -->
+    <section class="history-section">
+      <h2 class="section-title">Recent Scans</h2>
+      <div id="history-container">
+        <!-- Will be populated by JavaScript -->
+      </div>
+    </section>
+  </div>
+
+  <!-- System Status Bar -->
+  <div class="status-bar" id="status-bar">
+    <!-- Will be populated by JavaScript -->
+  </div>
+
+  <script type="module">
+    // Supabase configuration (from .env)
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL' // Replace with actual URL
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY' // Replace with actual key
+
+    // Import Supabase client (CDN)
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    // API Configurations
+    const API_CONFIGS = {
+      claude: { name: 'Claude API', color: '#00F5FF', cost: 0.0075 },
+      serpapi: { name: 'SerpAPI', color: '#FF6B00', cost: 0.0036, freeLimit: 250 },
+      firecrawl: { name: 'Firecrawl', color: '#BF5FFF', cost: 0.015 },
+      supabase: { name: 'Supabase', color: '#39FF14', cost: 0 }
+    }
+
+    // Live Clock
+    function updateClock() {
+      const now = new Date()
+      const formatted = now.toLocaleString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      })
+      document.getElementById('live-clock').textContent = formatted
+    }
+    setInterval(updateClock, 1000)
+    updateClock()
+
+    // Count-up animation for numbers
+    function animateNumber(element, target, duration = 1000, prefix = '', suffix = '') {
+      const start = 0
+      const increment = target / (duration / 16) // 60fps
+      let current = start
+
+      const timer = setInterval(() => {
+        current += increment
+        if (current >= target) {
+          current = target
+          clearInterval(timer)
+        }
+        element.textContent = prefix + Math.round(current).toLocaleString() + suffix
+      }, 16)
+    }
+
+    // Load dashboard data
+    async function loadDashboardData() {
+      try {
+        // Get today's stats
+        const today = new Date().toISOString().split('T')[0]
+
+        const { data: todayData, error: todayError } = await supabase
+          .from('api_tracking')
+          .select('*')
+          .gte('created_at', today)
+
+        if (todayError) throw todayError
+
+        // Process data
+        const apiStats = {}
+        let totalScans = 0
+        let totalCost = 0
+
+        Object.keys(API_CONFIGS).forEach(api => {
+          apiStats[api] = {
+            calls: 0,
+            cost: 0,
+            successCount: 0,
+            errorCount: 0,
+            avgResponseTime: 0,
+            lastCall: null
+          }
+        })
+
+        todayData.forEach(row => {
+          const api = row.api_name
+          if (!apiStats[api]) return
+
+          apiStats[api].calls += row.call_count
+          apiStats[api].cost += parseFloat(row.estimated_cost)
+          totalCost += parseFloat(row.estimated_cost)
+
+          if (row.status === 'success') apiStats[api].successCount++
+          if (row.status === 'error') apiStats[api].errorCount++
+
+          if (!apiStats[api].lastCall || new Date(row.created_at) > new Date(apiStats[api].lastCall)) {
+            apiStats[api].lastCall = row.created_at
+          }
+        })
+
+        // Count unique scans (distinct scan_url)
+        const uniqueScans = new Set(todayData.map(r => r.scan_url))
+        totalScans = uniqueScans.size
+
+        // Update hero stats
+        animateNumber(document.getElementById('total-scans-today'), totalScans)
+        animateNumber(document.getElementById('total-cost-today'), totalCost, 1000, '$', '')
+        document.getElementById('total-cost-today').textContent = `$${totalCost.toFixed(4)}`
+
+        // Render API cards
+        renderApiCards(apiStats)
+
+        // Render cost breakdown
+        renderCostBreakdown(apiStats, totalCost, totalScans)
+
+        // Render history table
+        renderHistory(todayData.slice(0, 20))
+
+        // Render status bar
+        renderStatusBar(apiStats)
+
+      } catch (error) {
+        console.error('Error loading dashboard data:', error)
+        showEmptyState()
+      }
+    }
+
+    // Render API cards
+    function renderApiCards(stats) {
+      const container = document.getElementById('api-cards')
+      container.innerHTML = ''
+
+      Object.entries(API_CONFIGS).forEach(([key, config], index) => {
+        const stat = stats[key]
+        const isActive = stat.calls > 0 && stat.errorCount === 0
+        const hasErrors = stat.errorCount > 0
+
+        const card = document.createElement('div')
+        card.className = `api-card ${key} fade-in stagger-${index + 1}`
+
+        let badgeHtml = ''
+        if (key === 'serpapi') {
+          badgeHtml = '<div class="api-badge">TEMPORARY</div>'
+        }
+
+        let usageBarHtml = ''
+        if (config.freeLimit) {
+          const usagePercent = (stat.calls / config.freeLimit) * 100
+          usageBarHtml = `
+            <div class="api-usage-bar">
+              <div class="api-usage-fill" style="width: ${Math.min(usagePercent, 100)}%"></div>
+            </div>
+            <div class="api-last-call">${stat.calls} / ${config.freeLimit} searches used</div>
+          `
+        }
+
+        const lastCallText = stat.lastCall
+          ? new Date(stat.lastCall).toLocaleTimeString()
+          : 'No calls yet'
+
+        card.innerHTML = `
+          <div class="api-card-header">
+            <div>
+              <div class="api-card-title">${config.name}</div>
+              ${badgeHtml}
+            </div>
+            <div class="api-status-dot ${isActive ? 'active' : hasErrors ? 'error' : 'warning'}"></div>
+          </div>
+          <div class="api-metrics">
+            <div class="api-metric">
+              <span class="api-metric-label">Calls Today</span>
+              <span class="api-metric-value ${key}">${stat.calls.toLocaleString()}</span>
+            </div>
+            <div class="api-metric">
+              <span class="api-metric-label">Cost Today</span>
+              <span class="api-metric-value ${key}">$${stat.cost.toFixed(4)}</span>
+            </div>
+            <div class="api-metric">
+              <span class="api-metric-label">Success Rate</span>
+              <span class="api-metric-value ${key}">${stat.calls > 0 ? Math.round((stat.successCount / stat.calls) * 100) : 0}%</span>
+            </div>
+          </div>
+          ${usageBarHtml}
+          <div class="api-last-call">Last called: ${lastCallText}</div>
+        `
+
+        container.appendChild(card)
+      })
+    }
+
+    // Render cost breakdown
+    function renderCostBreakdown(stats, totalCost, totalScans) {
+      const container = document.getElementById('cost-breakdown')
+      container.innerHTML = ''
+
+      // Cost per scan
+      const costPerScan = totalScans > 0 ? totalCost / totalScans : 0
+
+      const cards = [
+        { label: 'Cost Per Scan', value: `$${costPerScan.toFixed(4)}` },
+        { label: 'Monthly Projection', value: `$${(totalCost * 30).toFixed(2)}` },
+        { label: 'At 100 Users', value: `$${(costPerScan * 100 * 30).toFixed(2)}/mo` },
+        { label: 'At 1000 Users', value: `$${(costPerScan * 1000 * 30).toFixed(2)}/mo` }
+      ]
+
+      cards.forEach(({ label, value }) => {
+        const card = document.createElement('div')
+        card.className = 'cost-card fade-in'
+        card.innerHTML = `
+          <div class="cost-label">${label}</div>
+          <div class="cost-value">${value}</div>
+        `
+        container.appendChild(card)
+      })
+    }
+
+    // Render history table
+    function renderHistory(data) {
+      const container = document.getElementById('history-container')
+
+      if (data.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <div class="empty-state-title">No scans recorded yet</div>
+            <div class="empty-state-text">Run your first scan to see data here.</div>
+          </div>
+        `
+        return
+      }
+
+      const table = document.createElement('table')
+      table.className = 'history-table'
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>URL Scanned</th>
+            <th>API</th>
+            <th>Cost</th>
+            <th>Response Time</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.map(row => `
+            <tr>
+              <td class="time-cell">${new Date(row.created_at).toLocaleString()}</td>
+              <td class="url-cell">${row.scan_url}</td>
+              <td>${API_CONFIGS[row.api_name]?.name || row.api_name}</td>
+              <td>$${parseFloat(row.estimated_cost).toFixed(4)}</td>
+              <td>${row.response_time_ms ? row.response_time_ms + 'ms' : '—'}</td>
+              <td><span class="status-badge ${row.status}">${row.status}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `
+
+      container.innerHTML = ''
+      container.appendChild(table)
+    }
+
+    // Render status bar
+    function renderStatusBar(stats) {
+      const container = document.getElementById('status-bar')
+      container.innerHTML = ''
+
+      // Get SerpAPI remaining
+      const serpUsed = stats.serpapi.calls
+      const serpLimit = API_CONFIGS.serpapi.freeLimit
+      const serpRemaining = serpLimit - serpUsed
+
+      const pills = [
+        { label: 'Claude', active: stats.claude.calls > 0 },
+        { label: 'SerpAPI', active: stats.serpapi.calls > 0 },
+        { label: 'Firecrawl', active: stats.firecrawl.calls > 0 },
+        { label: 'Supabase', active: true },
+        { label: `SerpAPI: ${serpRemaining} searches remaining`, active: true, special: true }
+      ]
+
+      pills.forEach(({ label, active, special }) => {
+        const pill = document.createElement('div')
+        pill.className = 'status-pill'
+        pill.innerHTML = special
+          ? `<span>${label}</span>`
+          : `<div class="status-pill-dot ${active ? '' : 'warning'}"></div><span>${label}</span>`
+        container.appendChild(pill)
+      })
+
+      // Amazon Creators API pending pill
+      const amazonPill = document.createElement('div')
+      amazonPill.className = 'status-pill'
+      amazonPill.style.borderColor = API_CONFIGS.serpapi.color
+      amazonPill.innerHTML = '<span>Amazon Creators API: PENDING</span>'
+      container.appendChild(amazonPill)
+    }
+
+    // Show empty state
+    function showEmptyState() {
+      document.getElementById('api-cards').innerHTML = `
+        <div class="empty-state" style="grid-column: 1 / -1;">
+          <div class="empty-state-icon">📊</div>
+          <div class="empty-state-title">No data yet</div>
+          <div class="empty-state-text">Run your first scan to see API usage data here.</div>
+        </div>
+      `
+    }
+
+    // Make loadDashboardData global for refresh button
+    window.loadDashboardData = loadDashboardData
+
+    // Initial load
+    loadDashboardData()
+
+    // Auto-refresh every 30 seconds
+    setInterval(loadDashboardData, 30000)
+  </script>
+</body>
+</html>
