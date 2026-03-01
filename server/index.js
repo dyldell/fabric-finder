@@ -874,18 +874,25 @@ Product type: ${productType}
 Here are candidate products to rank:
 ${productsJson}
 
-For each product, analyze the title and features to estimate the fabric composition match percentage:
-- 100% = Exact same fabrics and percentages
-- 90-99% = Same fabrics, slightly different percentages
-- 80-89% = Same main fabric, different secondary fabrics
+For each product, analyze the title and features to estimate the fabric composition match percentage.
+
+IMPORTANT SCORING GUIDELINES for Polyester/Elastane (Spandex) blends:
+- Products with "Performance", "Moisture Wicking", "Tech", "Athletic", "Dry Fit", "Quick Dry", "UPF" are HIGHLY LIKELY to be polyester/elastane blends
+- These keywords indicate 90-100% match for polyester/elastane searches
+- "odSTRATUM", "Cool Dri", "Dri-Power", brand names suggest high-performance polyester blends
+
+Scoring rubric:
+- 95-100% = Has 3+ performance keywords (Performance, Moisture Wicking, Tech, UPF, Quick Dry, Athletic)
+- 90-94% = Has 2 performance keywords
+- 85-89% = Has 1 performance keyword or "workout/gym/running" in title
+- 80-84% = Generic athletic wear without specific performance features
 - 70-79% = Similar fabric type (e.g., polyester vs nylon)
-- 60-69% = Same product type but different fabric family
-- <60% = Poor match
+- <70% = Poor match
 
 Return ONLY a JSON array with this structure:
 [
-  {"index": 0, "matchPercentage": 95, "reason": "Likely 87% Polyester, 13% Spandex based on title"},
-  {"index": 1, "matchPercentage": 75, "reason": "Similar synthetic blend"}
+  {"index": 0, "matchPercentage": 98, "reason": "Performance + Moisture Wicking + Tech + UPF indicates polyester/elastane blend"},
+  {"index": 1, "matchPercentage": 85, "reason": "Athletic tee, likely synthetic blend"}
 ]`
 
     const message = await anthropic.messages.create({
