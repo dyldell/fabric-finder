@@ -473,7 +473,12 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
         'pant': 'pants',
         'tight': 'leggings'
       }
-      const expandedType = typeExpansions[type] || type
+      let expandedType = typeExpansions[type] || type
+
+      // Women's "pants" in athletic context = leggings
+      if (gender === 'womens' && (type === 'pants' || type === 'pant')) {
+        expandedType = 'leggings'
+      }
 
       // Create smart search query with gender + expanded type
       if (gender && expandedType) {
@@ -660,11 +665,41 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   console.log('[Search] Starting multi-query search strategy')
 
   const gender = fabricData.gender || ''
-  const type = fabricData.product_type || productType
+  let type = fabricData.product_type || productType
 
-  // Build fabric string with percentages (e.g., "96% Polyester 4% Elastane")
+  // Women's "pants" in athletic context = leggings
+  if (gender === 'womens' && (type === 'pants' || type === 'pant')) {
+    type = 'leggings'
+  }
+
+  // Get fabric with all alternate names for comprehensive search
+  const getFabricWithAlternates = (fabricType) => {
+    // First normalize brand names to generic terms
+    const normalizations = {
+      'Lycra Elastane': 'Elastane',
+      'Lycra': 'Elastane'
+    }
+    const normalized = normalizations[fabricType] || fabricType
+
+    // Then add all alternate names
+    const synonyms = {
+      'Elastane': 'Elastane Spandex',  // Include both terms
+      'Spandex': 'Elastane Spandex',
+      'Nylon': 'Nylon Polyamide',
+      'Polyamide': 'Nylon Polyamide',
+      'Rayon': 'Rayon Viscose',
+      'Viscose': 'Rayon Viscose',
+      'Polyurethane': 'Polyurethane PU',
+      'PU': 'Polyurethane PU'
+    }
+
+    return synonyms[normalized] || normalized
+  }
+
+  // Build fabric string with percentages and alternate names
+  // e.g., "96% Polyester 4% Elastane Spandex" (searches for both Elastane AND Spandex)
   const fabricString = fabricData.fabrics
-    .map(f => `${f.percentage}% ${f.type}`)
+    .map(f => `${f.percentage}% ${getFabricWithAlternates(f.type)}`)
     .join(' ')
 
   // Build 3 different search queries to maximize coverage

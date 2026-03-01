@@ -15,6 +15,39 @@ const Results = ({ data }) => {
     }
   }, [data])
 
+  // Check if product contains fabrics with alternate names
+  const getFabricEducationTooltip = () => {
+    if (!data.fabrics) return null
+
+    const fabricSynonyms = {
+      'Elastane': { names: ['Spandex', 'Lycra'], primary: 'Elastane' },
+      'Spandex': { names: ['Elastane', 'Lycra'], primary: 'Elastane' },
+      'Lycra': { names: ['Elastane', 'Spandex'], primary: 'Elastane' },
+      'Lycra Elastane': { names: ['Elastane', 'Spandex'], primary: 'Elastane' },
+      'Nylon': { names: ['Polyamide'], primary: 'Nylon' },
+      'Polyamide': { names: ['Nylon'], primary: 'Nylon' },
+      'Rayon': { names: ['Viscose'], primary: 'Rayon' },
+      'Viscose': { names: ['Rayon'], primary: 'Rayon' }
+    }
+
+    const foundSynonyms = data.fabrics
+      .map(f => fabricSynonyms[f.type])
+      .filter(Boolean)
+
+    if (foundSynonyms.length === 0) return null
+
+    // Get unique synonym groups
+    const uniqueGroups = [...new Set(foundSynonyms.map(s => s.primary))]
+
+    return uniqueGroups.map(primary => {
+      const info = Object.values(fabricSynonyms).find(s => s.primary === primary)
+      const allNames = [primary, ...info.names].join(', ')
+      return `${allNames} are the same fiber`
+    }).join(' • ')
+  }
+
+  const fabricEducation = getFabricEducationTooltip()
+
   // Get alternatives from backend
   const alternatives = data.alternatives || []
 
@@ -92,6 +125,14 @@ const Results = ({ data }) => {
                 </div>
               ))}
             </div>
+
+            {/* Fabric Education Tooltip - only shown when relevant */}
+            {fabricEducation && (
+              <div className="fabric-education-tip">
+                <span className="tip-icon">💡</span>
+                <span className="tip-text">Did you know? {fabricEducation}</span>
+              </div>
+            )}
           </div>
         )}
 
