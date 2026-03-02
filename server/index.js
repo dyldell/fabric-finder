@@ -162,14 +162,14 @@ async function saveToCache(url, fabricData) {
 async function scrapeWithFirecrawl(url) {
   console.log(`[Firecrawl] Scraping URL: ${url}`)
 
-  // Detect if URL needs special JSON extraction (Alo Yoga, Lululemon)
-  const useJsonExtraction = url.includes('aloyoga.com') || url.includes('lululemon.com')
-  const needsStealth = useJsonExtraction || url.includes('patagonia.com') || url.includes('abercrombie.com') || url.includes('gymshark.com')
+  // Detect if URL needs special JSON extraction (Alo Yoga, Lululemon, Gymshark)
+  const useJsonExtraction = url.includes('aloyoga.com') || url.includes('lululemon.com') || url.includes('gymshark.com')
+  const needsStealth = useJsonExtraction || url.includes('patagonia.com') || url.includes('abercrombie.com')
 
   try {
-    // For Alo Yoga and Lululemon, use JSON extraction instead of markdown
+    // For Alo Yoga, Lululemon, and Gymshark, use JSON extraction instead of markdown
     if (useJsonExtraction) {
-      const brand = url.includes('aloyoga.com') ? 'Alo Yoga' : 'Lululemon'
+      const brand = url.includes('aloyoga.com') ? 'Alo Yoga' : url.includes('gymshark.com') ? 'Gymshark' : 'Lululemon'
       console.log(`[Firecrawl] Using JSON extraction for ${brand}`)
 
       const scrapeOptions = {
