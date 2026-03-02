@@ -285,6 +285,7 @@ CRITICAL RULES:
 6. Extract the product type (shirt, pants, leggings, shorts, jacket, bra, tank, tee, etc.)
 7. Extract the gender (mens, womens, unisex)
 8. Extract the main product image URL if available
+9. Extract performance keywords from product title/description (Tech, Performance, Moisture Wicking, Quick Dry, UPF, Dry Fit, Cooling, Athletic, etc.)
 
 Example:
 If you see "Pocket Lining: 90% Polyester, 10% Lycra | Body: 71% Nylon, 29% Lycra Elastane"
@@ -301,8 +302,11 @@ Return ONLY a valid JSON object with this exact structure:
     {"type": "Spandex", "percentage": 13}
   ],
   "quality_tier": "premium athletic",
-  "features": ["moisture-wicking", "4-way stretch"]
+  "features": ["moisture-wicking", "4-way stretch"],
+  "keywords": ["Performance", "Tech"]
 }
+
+The "keywords" field should contain searchable brand-agnostic terms from the product name/description (Tech, Performance, Sport, Athletic, Dry Fit, etc.) - NOT fabric features.
 
 Product page content:
 ${scrapedContent}
@@ -574,7 +578,7 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
       search.json({
         engine: 'google_shopping',
         q: searchQuery,
-        num: 20, // Get top 20 results per query (more chances to find exact matches)
+        num: 10, // Get top 10 results per query
         gl: 'us', // United States
         hl: 'en', // English
       }, (data) => {
@@ -617,8 +621,8 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
       console.log(`[SerpAPI] Filtered ${results.shopping_results.length} → ${filteredResults.length} products (excluded: ${exclusions.join(', ')})`)
     }
 
-    // Transform SerpAPI results into our format (get top 20 after filtering for better matches)
-    return filteredResults.slice(0, 20).map(product => {
+    // Transform SerpAPI results into our format (get top 10 after filtering)
+    return filteredResults.slice(0, 10).map(product => {
       // Add Amazon affiliate tag if it's an Amazon product
       let productUrl = product.product_link || product.link || '#'
       if (productUrl && productUrl.includes('amazon.com') && associateTag) {
@@ -696,8 +700,8 @@ async function searchAmazonViaSerpApi(fabricData, brand, productType = 'athletic
 
     console.log(`[SerpAPI Amazon] Found ${results.organic_results.length} Amazon products`)
 
-    // Transform Amazon results (get top 20 for better match coverage)
-    return results.organic_results.slice(0, 20).map(product => {
+    // Transform Amazon results
+    return results.organic_results.slice(0, 10).map(product => {
       // Add affiliate tag to Amazon URL
       let productUrl = product.link || '#'
       if (productUrl.includes('amazon.com')) {
@@ -750,52 +754,46 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     }
     const normalized = normalizations[fabricType] || fabricType
 
-    // Then add all alternate names
-    const synonyms = {
-      'Elastane': 'Elastane Spandex',  // Include both terms
-      'Spandex': 'Elastane Spandex',
-      'Nylon': 'Nylon Polyamide',
-      'Polyamide': 'Nylon Polyamide',
-      'Rayon': 'Rayon Viscose',
-      'Viscose': 'Rayon Viscose',
-      'Polyurethane': 'Polyurethane PU',
-      'PU': 'Polyurethane PU'
-    }
-
-    return synonyms[normalized] || normalized
+    // Return just the normalized fabric name (no synonyms in search query)
+    return normalized
   }
 
   // Build fabric string with percentages and alternate names
-  // e.g., "96% Polyester 4% Elastane Spandex" (searches for both Elastane AND Spandex)
+  // e.g., "96% Polyester 4% Elastane"
   const fabricString = fabricData.fabrics
     .map(f => `${f.percentage}% ${getFabricWithAlternates(f.type)}`)
     .join(' ')
 
+  // Build keyword string from extracted keywords (e.g., "Performance Tech")
+  const keywordString = (fabricData.keywords || []).slice(0, 2).join(' ')
+
   // Build 3 different search queries to maximize coverage
   const queries = []
 
-  // Query 1: Budget-focused (likely to find Amazon)
+  // Query 1: Fabric-based exact match
   queries.push({
-    name: 'budget',
-    query: gender && type
-      ? `budget ${gender} ${type} ${fabricString}`
-      : `budget ${type} ${fabricString}`
-  })
-
-  // Query 2: Exact match (current strategy)
-  queries.push({
-    name: 'exact',
+    name: 'fabric-exact',
     query: gender && type
       ? `${gender} ${type} ${fabricString}`
       : `${type} ${fabricString}`
   })
 
-  // Query 3: Value/affordable (catches different retailers)
+  // Query 2: Keyword-based search (catches products like ODODOS that don't list fabric %)
+  if (keywordString) {
+    queries.push({
+      name: 'keyword',
+      query: gender && type
+        ? `${gender} ${type} ${keywordString}`
+        : `${type} ${keywordString}`
+    })
+  }
+
+  // Query 3: Budget + keywords (broad search)
   queries.push({
-    name: 'affordable',
+    name: 'budget',
     query: gender && type
-      ? `affordable ${gender} ${type} ${fabricString}`
-      : `affordable ${type} ${fabricString}`
+      ? `budget ${gender} ${type} ${keywordString || 'athletic'}`
+      : `budget ${type} ${keywordString || 'athletic'}`
   })
 
   console.log(`[Search] Running searches: Amazon direct + Google Shopping (3 queries each)`)
