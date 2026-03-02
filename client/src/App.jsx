@@ -20,7 +20,8 @@ function App() {
     }
 
     try {
-      const response = await fetch('/api/analyze', {
+      // Use streaming endpoint for real-time updates
+      const response = await fetch('/api/analyze-stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -28,17 +29,62 @@ function App() {
         body: JSON.stringify({ url, refresh }),
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
-        // Handle API error with detailed message
+        const data = await response.json()
         const errorMessage = data.message || data.error || 'Failed to analyze product'
         const errorHint = data.hint ? `\n\n${data.hint}` : ''
         throw new Error(errorMessage + errorHint)
       }
 
-      setResults(data)
-      setCurrentUrl(url)
+      // Read Server-Sent Events stream
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      let fabricData = null
+      let alternatives = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        // Decode chunk
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data:')) continue
+
+          try {
+            const data = JSON.parse(line.replace(/^data: /, ''))
+
+            // Handle different event types
+            const eventLine = lines[lines.indexOf(line) - 1]
+            const eventType = eventLine?.replace(/^event: /, '').trim()
+
+            if (eventType === 'status') {
+              console.log('Status:', data.message)
+              // You can update UI with status messages here
+            } else if (eventType === 'fabric') {
+              fabricData = data
+              // Show fabric data immediately
+              setResults({ ...data, alternatives: [] })
+            } else if (eventType === 'alternatives') {
+              alternatives = data.alternatives
+            } else if (eventType === 'complete') {
+              // Final results
+              if (fabricData && alternatives) {
+                setResults({ ...fabricData, alternatives })
+              }
+              setCurrentUrl(url)
+            } else if (eventType === 'error') {
+              throw new Error(data.message || 'Analysis failed')
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse SSE event:', parseError)
+          }
+        }
+      }
+
     } catch (err) {
       setError(err.message)
     } finally {

@@ -23,6 +23,7 @@
     "@mendable/firecrawl-js": "^4.15.0",
     "@supabase/supabase-js": "^2.98.0",
     "amazon-paapi": "^1.0.7",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import compression from 'compression'
 import dotenv from 'dotenv'
 import Anthropic from '@anthropic-ai/sdk'
 import FirecrawlApp from '@mendable/firecrawl-js'
@@ -14,6 +15,7 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 // Middleware
+app.use(compression()) // Gzip compression for all responses
 app.use(cors())
 app.use(express.json())
 
@@ -272,8 +274,8 @@ async function scrapeWithFirecrawl(url) {
   }
 }
 
-// Extract fabric composition using Claude API
-async function extractFabricComposition(scrapedContent) {
+// Extract fabric composition using Claude API (with optional streaming)
+async function extractFabricComposition(scrapedContent, streamCallback = null) {
   const prompt = `You are a fabric composition analyzer. Analyze the following product page content and extract the MAIN BODY fabric composition only.
 
 CRITICAL RULES:
@@ -314,25 +316,66 @@ ${scrapedContent}
 Return ONLY the JSON object, no other text.`
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
+    // Use streaming if callback provided
+    if (streamCallback) {
+      console.log('[Claude] Using streaming API')
+      let fullText = ''
+
+      const stream = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        stream: true,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
+
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          const chunk = event.delta.text
+          fullText += chunk
+
+          // Send chunk to frontend via SSE
+          streamCallback({
+            type: 'chunk',
+            data: chunk,
+            accumulated: fullText
+          })
         }
-      ]
-    })
+      }
 
-    let responseText = message.content[0].text
+      // Strip code fences and parse
+      let responseText = fullText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      const fabricData = JSON.parse(responseText)
 
-    // Strip code fences if present (```json ... ```)
-    responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      // Send completion signal
+      streamCallback({
+        type: 'complete',
+        data: fabricData
+      })
 
-    // Parse the JSON response
-    const fabricData = JSON.parse(responseText)
-    return fabricData
+      return fabricData
+    } else {
+      // Non-streaming fallback
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
+
+      let responseText = message.content[0].text
+      responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      const fabricData = JSON.parse(responseText)
+      return fabricData
+    }
   } catch (error) {
     console.error('[Claude API Error]:', error)
     throw new Error('Failed to extract fabric composition')
@@ -1124,6 +1167,185 @@ function generateFallbackAlternatives(fabricData, brand, productType = 'athletic
     }
   ]
 }
+
+// Streaming version of /api/analyze using Server-Sent Events (SSE)
+app.post('/api/analyze-stream', async (req, res) => {
+  try {
+    const { url, refresh } = req.body
+
+    if (!url) {
+      return res.status(400).json({ error: 'URL is required' })
+    }
+
+    // Validate Lululemon URLs
+    if (url.includes('www.lululemon.com/products/')) {
+      return res.status(400).json({
+        error: 'Invalid Lululemon URL format',
+        message: 'Please use shop.lululemon.com URLs instead of www.lululemon.com/products/.'
+      })
+    }
+
+    // Set up Server-Sent Events
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.flushHeaders()
+
+    const sendEvent = (event, data) => {
+      res.write(`event: ${event}\n`)
+      res.write(`data: ${JSON.stringify(data)}\n\n`)
+    }
+
+    console.log(`\n[Streaming Analysis] URL: ${url}${refresh ? ' (FORCE REFRESH)' : ''}`)
+
+    const scanStartTime = Date.now()
+
+    // Step 1: Check cache
+    sendEvent('status', { step: 'cache', message: 'Checking cache...' })
+    const cachedData = await checkCache(url, refresh === true)
+
+    if (cachedData) {
+      console.log('[Cache] Returning cached result ⚡')
+      sendEvent('status', { step: 'cache_hit', message: 'Found in cache!' })
+
+      // Send fabric data immediately
+      sendEvent('fabric', {
+        product_name: cachedData.product_name,
+        product_type: cachedData.product_type,
+        gender: cachedData.gender,
+        product_image: cachedData.product_image,
+        fabrics: cachedData.fabrics,
+        quality_tier: cachedData.quality_tier,
+        features: cachedData.features,
+        brand: cachedData.brand
+      })
+
+      // Search for alternatives
+      sendEvent('status', { step: 'search', message: 'Finding cheaper alternatives...' })
+      const alternatives = await searchProductAlternatives(
+        {
+          fabrics: cachedData.fabrics,
+          quality_tier: cachedData.quality_tier,
+          features: cachedData.features,
+          product_type: cachedData.product_type,
+          gender: cachedData.gender,
+          keywords: cachedData.keywords
+        },
+        cachedData.brand,
+        cachedData.product_type || 'athletic wear'
+      )
+
+      sendEvent('alternatives', { alternatives })
+      sendEvent('complete', { cached: true, cached_at: cachedData.scraped_at })
+      res.end()
+      return
+    }
+
+    // Step 2: Scrape with Firecrawl
+    sendEvent('status', { step: 'scrape', message: 'Scraping product page...' })
+    const firecrawlStart = Date.now()
+    const scrapedData = await scrapeWithFirecrawl(url)
+    const firecrawlTime = Date.now() - firecrawlStart
+
+    if (!scrapedData.success) {
+      sendEvent('error', { message: 'Failed to scrape product page', details: scrapedData.error })
+      res.end()
+      return
+    }
+
+    await trackApiCall('firecrawl', {
+      scanUrl: url,
+      responseTime: firecrawlTime,
+      status: 'success'
+    })
+
+    // Step 3: Extract fabric composition (with streaming!)
+    let fabricData
+
+    if (scrapedData.fabricData) {
+      // JSON extraction already provided the data
+      console.log('[Analysis] Using JSON-extracted data')
+      fabricData = scrapedData.fabricData
+      sendEvent('fabric', {
+        ...fabricData,
+        brand: extractBrand(url)
+      })
+    } else {
+      // Stream Claude extraction to frontend
+      sendEvent('status', { step: 'extract', message: 'Analyzing fabric composition...' })
+
+      const claudeStart = Date.now()
+      fabricData = await extractFabricComposition(scrapedData.content, (streamData) => {
+        // Stream chunks to frontend in real-time
+        if (streamData.type === 'chunk') {
+          sendEvent('claude_chunk', { text: streamData.data })
+        } else if (streamData.type === 'complete') {
+          sendEvent('fabric', {
+            ...streamData.data,
+            brand: extractBrand(url)
+          })
+        }
+      })
+      const claudeTime = Date.now() - claudeStart
+
+      await trackApiCall('claude', {
+        scanUrl: url,
+        responseTime: claudeTime,
+        status: 'success'
+      })
+    }
+
+    // Step 4: Save to cache
+    await saveToCache(url, fabricData)
+
+    // Step 5: Search for alternatives
+    sendEvent('status', { step: 'search', message: 'Finding cheaper alternatives...' })
+    const brand = extractBrand(url)
+    const searchStart = Date.now()
+    const alternatives = await searchProductAlternatives(
+      fabricData,
+      brand,
+      fabricData.product_type || 'athletic wear'
+    )
+    const searchTime = Date.now() - searchStart
+
+    await trackApiCall('serpapi', {
+      scanUrl: url,
+      callCount: 5,
+      responseTime: searchTime,
+      status: 'success'
+    })
+
+    await trackApiCall('claude', {
+      scanUrl: url,
+      callCount: 1,
+      responseTime: searchTime,
+      status: 'success',
+      metadata: { purpose: 'product_scoring' }
+    })
+
+    const totalTime = Date.now() - scanStartTime
+
+    printApiSummary({
+      claudeCalls: 2,
+      serpapiCalls: 5,
+      firecrawlCalls: 1,
+      totalCost: (1 * 0.015) + (2 * 0.0075) + (5 * 0.0036),
+      scanTime: totalTime
+    })
+
+    // Send alternatives and complete
+    sendEvent('alternatives', { alternatives })
+    sendEvent('complete', { cached: false, scanTime: totalTime })
+    res.end()
+
+  } catch (error) {
+    console.error('[Streaming API Error]:', error)
+    res.write(`event: error\n`)
+    res.write(`data: ${JSON.stringify({ message: error.message || 'Analysis failed' })}\n\n`)
+    res.end()
+  }
+})
 
 // API route to get product alternatives
 app.post('/api/alternatives', async (req, res) => {
