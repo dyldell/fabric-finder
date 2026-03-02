@@ -6,6 +6,7 @@ import FirecrawlApp from '@mendable/firecrawl-js'
 import { createClient } from '@supabase/supabase-js'
 import SerpApi from 'google-search-results-nodejs'
 import amazonPaapi from 'amazon-paapi'
+import { trackApiCall, printApiSummary } from '../dashboard/tracker.js'
 
 dotenv.config()
 
@@ -354,6 +355,10 @@ app.post('/api/analyze', async (req, res) => {
 
     console.log(`\n[Analysis Started] URL: ${url}${refresh ? ' (FORCE REFRESH)' : ''}`)
 
+    // Track scan start time for total timing
+    const scanStartTime = Date.now()
+    const apiCallTracker = { firecrawl: 0, claude: 0, serpapi: 0 }
+
     // CACHE DISABLED FOR TESTING - Re-enable later
     // Step 1: Check cache first (HYBRID SYSTEM)
     // const cachedData = await checkCache(url, refresh === true)
@@ -391,14 +396,30 @@ app.post('/api/analyze', async (req, res) => {
 
     // Step 2: Scrape with Firecrawl (cache disabled)
     console.log('[Scraping] Fresh scrape - cache disabled for testing')
+    const firecrawlStart = Date.now()
     const scrapedData = await scrapeWithFirecrawl(url)
+    const firecrawlTime = Date.now() - firecrawlStart
 
     if (!scrapedData.success) {
+      // Track failed Firecrawl call
+      await trackApiCall('firecrawl', {
+        scanUrl: url,
+        responseTime: firecrawlTime,
+        status: 'error'
+      })
       return res.status(500).json({
         error: 'Failed to scrape product page',
         details: scrapedData.error
       })
     }
+
+    // Track successful Firecrawl call
+    await trackApiCall('firecrawl', {
+      scanUrl: url,
+      responseTime: firecrawlTime,
+      status: 'success'
+    })
+    apiCallTracker.firecrawl = 1
 
     // Step 3: Extract fabric composition
     let fabricData
@@ -410,7 +431,17 @@ app.post('/api/analyze', async (req, res) => {
     } else {
       // Use Claude API to extract from markdown content
       console.log('[Analysis] Extracting with Claude API')
+      const claudeStart = Date.now()
       fabricData = await extractFabricComposition(scrapedData.content)
+      const claudeTime = Date.now() - claudeStart
+
+      // Track Claude call
+      await trackApiCall('claude', {
+        scanUrl: url,
+        responseTime: claudeTime,
+        status: 'success'
+      })
+      apiCallTracker.claude++
     }
 
     console.log('[Analysis Complete]', fabricData)
@@ -421,11 +452,49 @@ app.post('/api/analyze', async (req, res) => {
 
     // Step 5: Search for real product alternatives
     const brand = extractBrand(url)
+    const searchStart = Date.now()
     const alternatives = await searchProductAlternatives(
       fabricData,
       brand,
       fabricData.product_type || 'athletic wear'
     )
+    const searchTime = Date.now() - searchStart
+
+    // Track SerpAPI calls (5 total: 2 Amazon + 3 Google Shopping)
+    await trackApiCall('serpapi', {
+      scanUrl: url,
+      callCount: 5,
+      responseTime: searchTime,
+      status: 'success'
+    })
+    apiCallTracker.serpapi = 5
+
+    // Track Claude scoring call (happens inside searchProductAlternatives)
+    await trackApiCall('claude', {
+      scanUrl: url,
+      callCount: 1,
+      responseTime: searchTime,
+      status: 'success',
+      metadata: { purpose: 'product_scoring' }
+    })
+    apiCallTracker.claude++
+
+    // Calculate total cost and print summary
+    const totalCost = (
+      (apiCallTracker.firecrawl * 0.015) +
+      (apiCallTracker.claude * 0.0075) +
+      (apiCallTracker.serpapi * 0.0036)
+    )
+
+    const totalTime = Date.now() - scanStartTime
+
+    printApiSummary({
+      claudeCalls: apiCallTracker.claude,
+      serpapiCalls: apiCallTracker.serpapi,
+      firecrawlCalls: apiCallTracker.firecrawl,
+      totalCost,
+      scanTime: totalTime
+    })
 
     // Return results
     res.json({

@@ -11,11 +11,17 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase client (uses SERVICE_KEY for server-side writes)
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-)
+// Lazy-load Supabase client (initialized on first use)
+let supabase = null
+function getSupabase() {
+  if (!supabase) {
+    supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    )
+  }
+  return supabase
+}
 
 // Cost models (per single call/request)
 const API_COSTS = {
@@ -53,7 +59,7 @@ export async function trackApiCall(apiName, options = {}) {
     const estimatedCost = cost ?? (API_COSTS[apiName] * callCount)
 
     // Insert into Supabase (non-blocking, fire-and-forget)
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('api_tracking')
       .insert({
         scan_url: scanUrl,
@@ -122,7 +128,7 @@ export function printApiSummary(scanData) {
  */
 export async function getTodaysCost() {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('api_tracking')
       .select('estimated_cost')
       .gte('created_at', new Date().toISOString().split('T')[0])
@@ -145,7 +151,7 @@ export async function getSerpApiUsageThisMonth() {
     startOfMonth.setDate(1)
     startOfMonth.setHours(0, 0, 0, 0)
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('api_tracking')
       .select('call_count')
       .eq('api_name', 'serpapi')
