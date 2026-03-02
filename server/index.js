@@ -526,9 +526,8 @@ app.post('/api/analyze', async (req, res) => {
 
     console.log('[Analysis Complete]', fabricData)
 
-    // CACHE DISABLED FOR TESTING - Re-enable later
     // Step 4: Save to cache for future lookups
-    // await saveToCache(url, fabricData)
+    await saveToCache(url, fabricData)
 
     // Step 5: Search for real product alternatives
     const brand = extractBrand(url)
@@ -540,14 +539,14 @@ app.post('/api/analyze', async (req, res) => {
     )
     const searchTime = Date.now() - searchStart
 
-    // Track SerpAPI calls (5 total: 2 Amazon + 3 Google Shopping)
+    // Track SerpAPI calls (4 total: 2 Amazon + 2 Google Shopping, reduced from 5)
     await trackApiCall('serpapi', {
       scanUrl: url,
-      callCount: 5,
+      callCount: 4,
       responseTime: searchTime,
       status: 'success'
     })
-    apiCallTracker.serpapi = 5
+    apiCallTracker.serpapi = 4
 
     // Track Claude scoring call (happens inside searchProductAlternatives)
     await trackApiCall('claude', {
@@ -868,7 +867,7 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
 
   const keywordString = keywords.join(' ')
 
-  // Build 3 different search queries to maximize coverage
+  // Build 2 optimized search queries (reduced from 3 to save API costs)
   const queries = []
 
   // Query 1: Fabric-based exact match
@@ -879,39 +878,41 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
       : `${type} ${fabricString}`
   })
 
-  // Query 2: Keyword-based search (catches products like ODODOS that don't list fabric %)
+  // Query 2: Keyword-based OR budget search (pick best one)
   if (keywordString) {
+    // If we have keywords, use keyword search (better quality)
     queries.push({
       name: 'keyword',
       query: gender && type
         ? `${gender} ${type} ${keywordString}`
         : `${type} ${keywordString}`
     })
+  } else {
+    // No keywords? Fall back to budget search
+    queries.push({
+      name: 'budget',
+      query: gender && type
+        ? `budget ${gender} ${type} athletic`
+        : `budget ${type} athletic`
+    })
   }
 
-  // Query 3: Budget + keywords (broad search)
-  queries.push({
-    name: 'budget',
-    query: gender && type
-      ? `budget ${gender} ${type} ${keywordString || 'athletic'}`
-      : `budget ${type} ${keywordString || 'athletic'}`
-  })
+  console.log(`[Search] Running searches: Amazon PAAPI + Amazon SerpAPI (2 queries) + Google Shopping (2 queries) - OPTIMIZED`)
 
-  console.log(`[Search] Running searches: Amazon direct + Google Shopping (3 queries each)`)
-
-  // Run all queries in parallel: Amazon PAAPI, Amazon SerpAPI (2 queries), Google Shopping SerpAPI (3 queries)
+  // Run queries in parallel: Amazon PAAPI + Amazon SerpAPI (2 queries) + Google Shopping SerpAPI (2 queries)
+  // REDUCED: Google Shopping from 3 to 2 queries (saves $0.0036/scan)
   const fabricExactQuery = queries.find(q => q.name === 'fabric-exact')
-  const budgetQuery = queries.find(q => q.name === 'budget')
+  const secondQuery = queries.find(q => q.name === 'keyword') || queries.find(q => q.name === 'budget')
 
-  const [amazonPaapiResults, amazonSerpExact, amazonSerpBudget, ...googleShoppingResults] = await Promise.all([
+  const [amazonPaapiResults, amazonSerpExact, amazonSerpSecond, ...googleShoppingResults] = await Promise.all([
     searchAmazonProducts(fabricData, brand, productType),
     searchAmazonViaSerpApi(fabricData, brand, productType, fabricExactQuery?.query || `${gender} ${type} athletic`),
-    searchAmazonViaSerpApi(fabricData, brand, productType, budgetQuery?.query || `budget ${type} athletic`),
+    searchAmazonViaSerpApi(fabricData, brand, productType, secondQuery?.query || `budget ${type} athletic`),
     ...queries.map(q => searchSerpApiProducts(fabricData, brand, productType, q.query))
   ])
 
   // Combine all Amazon results (PAAPI + SerpAPI)
-  const allAmazonResults = [...amazonPaapiResults, ...amazonSerpExact, ...amazonSerpBudget]
+  const allAmazonResults = [...amazonPaapiResults, ...amazonSerpExact, ...amazonSerpSecond]
 
   // Flatten Google Shopping results
   const allGoogleShoppingResults = googleShoppingResults.flat()
@@ -1364,7 +1365,7 @@ app.post('/api/analyze-stream', async (req, res) => {
 
     await trackApiCall('serpapi', {
       scanUrl: url,
-      callCount: 5,
+      callCount: 4,
       responseTime: searchTime,
       status: 'success'
     })
@@ -1381,9 +1382,9 @@ app.post('/api/analyze-stream', async (req, res) => {
 
     printApiSummary({
       claudeCalls: 2,
-      serpapiCalls: 5,
+      serpapiCalls: 4,
       firecrawlCalls: 1,
-      totalCost: (1 * 0.015) + (2 * 0.0075) + (5 * 0.0036),
+      totalCost: (1 * 0.015) + (2 * 0.0075) + (4 * 0.0036),
       scanTime: totalTime
     })
 
