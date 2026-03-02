@@ -54,7 +54,7 @@ const AnalysisForm = ({ onAnalyze, loading }) => {
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://lululemon.com/products/..."
+          placeholder="Paste any clothing URL to uncover the fabric..."
           className="form-input"
           disabled={loading}
           required
