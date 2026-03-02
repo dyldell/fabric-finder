@@ -164,7 +164,7 @@ async function scrapeWithFirecrawl(url) {
 
   // Detect if URL needs special JSON extraction (Alo Yoga, Lululemon)
   const useJsonExtraction = url.includes('aloyoga.com') || url.includes('lululemon.com')
-  const needsStealth = useJsonExtraction || url.includes('patagonia.com') || url.includes('abercrombie.com')
+  const needsStealth = useJsonExtraction || url.includes('patagonia.com') || url.includes('abercrombie.com') || url.includes('gymshark.com')
 
   try {
     // For Alo Yoga and Lululemon, use JSON extraction instead of markdown
