@@ -102,6 +102,14 @@ async function checkCache(url, forceRefresh = false) {
       return null
     }
 
+    // Normalize fabric names (remove "Recycled" prefix from cached data)
+    if (data.fabrics) {
+      data.fabrics = data.fabrics.map(f => ({
+        ...f,
+        type: f.type.replace(/^Recycled\s+/i, '')
+      }))
+    }
+
     // Update cache hit counter
     await supabase
       .from('products_cache')
@@ -351,6 +359,14 @@ Return ONLY the JSON object, no other text.`
       let responseText = fullText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
       const fabricData = JSON.parse(responseText)
 
+      // Normalize fabric names (remove "Recycled" prefix)
+      if (fabricData.fabrics) {
+        fabricData.fabrics = fabricData.fabrics.map(f => ({
+          ...f,
+          type: f.type.replace(/^Recycled\s+/i, '')
+        }))
+      }
+
       // Send completion signal
       streamCallback({
         type: 'complete',
@@ -374,6 +390,15 @@ Return ONLY the JSON object, no other text.`
       let responseText = message.content[0].text
       responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
       const fabricData = JSON.parse(responseText)
+
+      // Normalize fabric names (remove "Recycled" prefix)
+      if (fabricData.fabrics) {
+        fabricData.fabrics = fabricData.fabrics.map(f => ({
+          ...f,
+          type: f.type.replace(/^Recycled\s+/i, '')
+        }))
+      }
+
       return fabricData
     }
   } catch (error) {
@@ -475,6 +500,14 @@ app.post('/api/analyze', async (req, res) => {
       // JSON extraction already provided the data (Alo Yoga)
       console.log('[Analysis] Using JSON-extracted data')
       fabricData = scrapedData.fabricData
+
+      // Normalize fabric names (remove "Recycled" prefix)
+      if (fabricData.fabrics) {
+        fabricData.fabrics = fabricData.fabrics.map(f => ({
+          ...f,
+          type: f.type.replace(/^Recycled\s+/i, '')
+        }))
+      }
     } else {
       // Use Claude API to extract from markdown content
       console.log('[Analysis] Extracting with Claude API')
@@ -801,21 +834,32 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     return normalized
   }
 
+  // Normalize fabric names (remove "Recycled" prefix)
+  const normalizeFabricName = (fabricType) => {
+    return fabricType.replace(/^Recycled\s+/i, '')
+  }
+
   // Build fabric string with percentages and alternate names
   // e.g., "96% Polyester 4% Elastane"
   const fabricString = fabricData.fabrics
-    .map(f => `${f.percentage}% ${getFabricWithAlternates(f.type)}`)
+    .map(f => `${f.percentage}% ${getFabricWithAlternates(normalizeFabricName(f.type))}`)
     .join(' ')
 
   // Build keyword string from extracted keywords, excluding brand name
   const keywords = (fabricData.keywords || [])
     .filter(keyword => {
+      const keywordLower = keyword.toLowerCase()
+
       // Exclude brand name from keywords (case-insensitive)
-      if (brand && keyword.toLowerCase().includes(brand.toLowerCase())) {
+      if (brand && keywordLower.includes(brand.toLowerCase())) {
         return false
       }
       // Exclude if brand is contained in keyword (e.g., "Vuori" in "VuoriTech")
-      if (brand && brand.toLowerCase().includes(keyword.toLowerCase())) {
+      if (brand && brand.toLowerCase().includes(keywordLower)) {
+        return false
+      }
+      // Exclude "recycled" keywords (e.g., "Recycled Polyester")
+      if (keywordLower.includes('recycled')) {
         return false
       }
       return true
@@ -1266,6 +1310,15 @@ app.post('/api/analyze-stream', async (req, res) => {
       // JSON extraction already provided the data
       console.log('[Analysis] Using JSON-extracted data')
       fabricData = scrapedData.fabricData
+
+      // Normalize fabric names (remove "Recycled" prefix)
+      if (fabricData.fabrics) {
+        fabricData.fabrics = fabricData.fabrics.map(f => ({
+          ...f,
+          type: f.type.replace(/^Recycled\s+/i, '')
+        }))
+      }
+
       sendEvent('fabric', {
         ...fabricData,
         brand: extractBrand(url)

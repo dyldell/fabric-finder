@@ -42,45 +42,53 @@ function App() {
 
       let fabricData = null
       let alternatives = null
+      let buffer = '' // Accumulate chunks
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        // Decode chunk
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
 
-        for (const line of lines) {
-          if (!line.trim() || !line.startsWith('data:')) continue
+        // Keep the last incomplete line in buffer
+        buffer = lines.pop() || ''
 
-          try {
-            const data = JSON.parse(line.replace(/^data: /, ''))
+        // Process complete lines
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim()
+          if (!line) continue
 
-            // Handle different event types
-            const eventLine = lines[lines.indexOf(line) - 1]
-            const eventType = eventLine?.replace(/^event: /, '').trim()
+          // Parse event type
+          if (line.startsWith('event:')) {
+            const eventType = line.replace(/^event:\s*/, '').trim()
+            // Next line should be data
+            const dataLine = lines[i + 1]?.trim()
+            if (dataLine?.startsWith('data:')) {
+              try {
+                const data = JSON.parse(dataLine.replace(/^data:\s*/, ''))
 
-            if (eventType === 'status') {
-              console.log('Status:', data.message)
-              // You can update UI with status messages here
-            } else if (eventType === 'fabric') {
-              fabricData = data
-              // Show fabric data immediately
-              setResults({ ...data, alternatives: [] })
-            } else if (eventType === 'alternatives') {
-              alternatives = data.alternatives
-            } else if (eventType === 'complete') {
-              // Final results
-              if (fabricData && alternatives) {
-                setResults({ ...fabricData, alternatives })
+                if (eventType === 'status') {
+                  console.log('Status:', data.message)
+                } else if (eventType === 'fabric') {
+                  fabricData = data
+                  setResults({ ...data, alternatives: [] })
+                } else if (eventType === 'alternatives') {
+                  alternatives = data.alternatives
+                } else if (eventType === 'complete') {
+                  if (fabricData && alternatives) {
+                    setResults({ ...fabricData, alternatives })
+                  }
+                  setCurrentUrl(url)
+                } else if (eventType === 'error') {
+                  throw new Error(data.message || 'Analysis failed')
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse SSE event:', parseError, dataLine)
               }
-              setCurrentUrl(url)
-            } else if (eventType === 'error') {
-              throw new Error(data.message || 'Analysis failed')
+              i++ // Skip the data line we just processed
             }
-          } catch (parseError) {
-            console.warn('Failed to parse SSE event:', parseError)
           }
         }
       }
