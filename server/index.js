@@ -799,10 +799,13 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   console.log(`[Search] Running searches: Amazon direct + Google Shopping (3 queries each)`)
 
   // Run all queries in parallel: Amazon PAAPI, Amazon SerpAPI (2 queries), Google Shopping SerpAPI (3 queries)
+  const fabricExactQuery = queries.find(q => q.name === 'fabric-exact')
+  const budgetQuery = queries.find(q => q.name === 'budget')
+
   const [amazonPaapiResults, amazonSerpExact, amazonSerpBudget, ...googleShoppingResults] = await Promise.all([
     searchAmazonProducts(fabricData, brand, productType),
-    searchAmazonViaSerpApi(fabricData, brand, productType, queries.find(q => q.name === 'exact').query),
-    searchAmazonViaSerpApi(fabricData, brand, productType, queries.find(q => q.name === 'budget').query),
+    searchAmazonViaSerpApi(fabricData, brand, productType, fabricExactQuery?.query || `${gender} ${type} athletic`),
+    searchAmazonViaSerpApi(fabricData, brand, productType, budgetQuery?.query || `budget ${type} athletic`),
     ...queries.map(q => searchSerpApiProducts(fabricData, brand, productType, q.query))
   ])
 
