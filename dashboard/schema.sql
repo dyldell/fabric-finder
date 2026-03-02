@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS api_tracking (
 CREATE INDEX IF NOT EXISTS idx_api_tracking_created_at ON api_tracking(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_api_tracking_api_name ON api_tracking(api_name);
 CREATE INDEX IF NOT EXISTS idx_api_tracking_status ON api_tracking(status);
-CREATE INDEX IF NOT EXISTS idx_api_tracking_date ON api_tracking(DATE(created_at));
 
 -- Daily totals view (aggregated for performance)
 CREATE OR REPLACE VIEW daily_totals AS
