@@ -164,7 +164,7 @@ async function scrapeWithFirecrawl(url) {
 
   // Detect if URL needs special JSON extraction (Alo Yoga, Lululemon)
   const useJsonExtraction = url.includes('aloyoga.com') || url.includes('lululemon.com')
-  const needsStealth = useJsonExtraction || url.includes('patagonia.com')
+  const needsStealth = useJsonExtraction || url.includes('patagonia.com') || url.includes('abercrombie.com')
 
   try {
     // For Alo Yoga and Lululemon, use JSON extraction instead of markdown
@@ -574,7 +574,7 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
       search.json({
         engine: 'google_shopping',
         q: searchQuery,
-        num: 10, // Get top 10 results per query
+        num: 20, // Get top 20 results per query (more chances to find exact matches)
         gl: 'us', // United States
         hl: 'en', // English
       }, (data) => {
@@ -617,8 +617,8 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
       console.log(`[SerpAPI] Filtered ${results.shopping_results.length} → ${filteredResults.length} products (excluded: ${exclusions.join(', ')})`)
     }
 
-    // Transform SerpAPI results into our format (get top 10 after filtering)
-    return filteredResults.slice(0, 10).map(product => {
+    // Transform SerpAPI results into our format (get top 20 after filtering for better matches)
+    return filteredResults.slice(0, 20).map(product => {
       // Add Amazon affiliate tag if it's an Amazon product
       let productUrl = product.product_link || product.link || '#'
       if (productUrl && productUrl.includes('amazon.com') && associateTag) {
@@ -696,8 +696,8 @@ async function searchAmazonViaSerpApi(fabricData, brand, productType = 'athletic
 
     console.log(`[SerpAPI Amazon] Found ${results.organic_results.length} Amazon products`)
 
-    // Transform Amazon results
-    return results.organic_results.slice(0, 10).map(product => {
+    // Transform Amazon results (get top 20 for better match coverage)
+    return results.organic_results.slice(0, 20).map(product => {
       // Add affiliate tag to Amazon URL
       let productUrl = product.link || '#'
       if (productUrl.includes('amazon.com')) {
