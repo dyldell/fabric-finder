@@ -363,43 +363,43 @@ app.post('/api/analyze', async (req, res) => {
     const scanStartTime = Date.now()
     const apiCallTracker = { firecrawl: 0, claude: 0, serpapi: 0 }
 
-    // CACHE DISABLED FOR TESTING - Re-enable later
     // Step 1: Check cache first (HYBRID SYSTEM)
-    // const cachedData = await checkCache(url, refresh === true)
-    //
-    // if (cachedData) {
-    //   console.log('[Cache] Returning cached result ⚡')
-    //
-    //   // Generate alternatives even for cached results
-    //   const alternatives = await searchProductAlternatives(
-    //     {
-    //       fabrics: cachedData.fabrics,
-    //       quality_tier: cachedData.quality_tier,
-    //       features: cachedData.features,
-    //       product_type: cachedData.product_type,
-    //       gender: cachedData.gender
-    //     },
-    //     cachedData.brand,
-    //     cachedData.product_type || 'athletic wear'
-    //   )
-    //
-    //   return res.json({
-    //     product_name: cachedData.product_name,
-    //     product_type: cachedData.product_type,
-    //     gender: cachedData.gender,
-    //     product_image: cachedData.product_image,
-    //     fabrics: cachedData.fabrics,
-    //     quality_tier: cachedData.quality_tier,
-    //     features: cachedData.features,
-    //     alternatives,
-    //     brand: cachedData.brand,
-    //     cached: true,
-    //     cached_at: cachedData.scraped_at
-    //   })
-    // }
+    const cachedData = await checkCache(url, refresh === true)
 
-    // Step 2: Scrape with Firecrawl (cache disabled)
-    console.log('[Scraping] Fresh scrape - cache disabled for testing')
+    if (cachedData) {
+      console.log('[Cache] Returning cached result ⚡')
+
+      // Generate alternatives even for cached results
+      const alternatives = await searchProductAlternatives(
+        {
+          fabrics: cachedData.fabrics,
+          quality_tier: cachedData.quality_tier,
+          features: cachedData.features,
+          product_type: cachedData.product_type,
+          gender: cachedData.gender,
+          keywords: cachedData.keywords
+        },
+        cachedData.brand,
+        cachedData.product_type || 'athletic wear'
+      )
+
+      return res.json({
+        product_name: cachedData.product_name,
+        product_type: cachedData.product_type,
+        gender: cachedData.gender,
+        product_image: cachedData.product_image,
+        fabrics: cachedData.fabrics,
+        quality_tier: cachedData.quality_tier,
+        features: cachedData.features,
+        alternatives,
+        brand: cachedData.brand,
+        cached: true,
+        cached_at: cachedData.scraped_at
+      })
+    }
+
+    // Step 2: Scrape with Firecrawl
+    console.log('[Scraping] Fresh scrape from source')
     const firecrawlStart = Date.now()
     const scrapedData = await scrapeWithFirecrawl(url)
     const firecrawlTime = Date.now() - firecrawlStart
@@ -764,8 +764,22 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     .map(f => `${f.percentage}% ${getFabricWithAlternates(f.type)}`)
     .join(' ')
 
-  // Build keyword string from extracted keywords (e.g., "Performance Tech")
-  const keywordString = (fabricData.keywords || []).slice(0, 2).join(' ')
+  // Build keyword string from extracted keywords, excluding brand name
+  const keywords = (fabricData.keywords || [])
+    .filter(keyword => {
+      // Exclude brand name from keywords (case-insensitive)
+      if (brand && keyword.toLowerCase().includes(brand.toLowerCase())) {
+        return false
+      }
+      // Exclude if brand is contained in keyword (e.g., "Vuori" in "VuoriTech")
+      if (brand && brand.toLowerCase().includes(keyword.toLowerCase())) {
+        return false
+      }
+      return true
+    })
+    .slice(0, 2)
+
+  const keywordString = keywords.join(' ')
 
   // Build 3 different search queries to maximize coverage
   const queries = []
@@ -855,6 +869,36 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   rankedProducts.sort((a, b) => b.matchPercentage - a.matchPercentage)
 
   console.log(`[Search] Sorted by fabric match % only`)
+
+  // Filter out the original brand and brand-specific keywords
+  if (brand) {
+    const originalCount = rankedProducts.length
+    const brandKeywords = fabricData.keywords || []
+
+    rankedProducts = rankedProducts.filter(product => {
+      const title = product.title.toLowerCase()
+      const brandName = brand.toLowerCase()
+
+      // Exclude if contains brand name
+      if (title.includes(brandName)) {
+        return false
+      }
+
+      // Exclude if contains brand-specific keywords (like "DreamKnit" for Vuori)
+      // Only exclude if keyword is capitalized/unique (likely brand-specific)
+      for (const keyword of brandKeywords) {
+        if (keyword.length > 5 && keyword[0] === keyword[0].toUpperCase()) {
+          if (title.includes(keyword.toLowerCase())) {
+            return false
+          }
+        }
+      }
+
+      return true
+    })
+
+    console.log(`[Filter] Removed ${originalCount - rankedProducts.length} products containing "${brand}" or brand keywords`)
+  }
 
   // Log final top 10 (sorted by fabric match % only)
   console.log('\n[Final Top 10 - By Fabric Match]:')
