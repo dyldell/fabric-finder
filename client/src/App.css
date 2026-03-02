@@ -3,67 +3,98 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  z-index: 2;
 }
 
 .container {
-  max-width: 680px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 48px 24px;
+  padding: var(--space-12) var(--space-6);
   width: 100%;
   flex: 1;
 }
 
+/* Premium Error Message */
 .error-message {
-  background: #FDF5F5;
+  max-width: 640px;
+  margin: 0 auto var(--space-10);
+  background: white;
   border: 1.5px solid var(--color-error);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   padding: var(--space-8);
-  margin-bottom: var(--space-10);
   text-align: center;
+  box-shadow: var(--shadow-lg);
+  animation: fadeInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .error-icon {
-  font-size: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--color-error-light);
   color: var(--color-error);
+  border-radius: 50%;
+  font-size: 24px;
   margin-bottom: var(--space-4);
+}
+
+.error-content {
+  margin-bottom: var(--space-6);
 }
 
 .error-message p {
   font-size: 15px;
   color: var(--color-text-secondary);
   line-height: 1.6;
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
+}
+
+.error-message p:last-child {
+  margin-bottom: 0;
 }
 
 .error-retry {
   display: inline-block;
   padding: 12px 32px;
-  background: var(--color-primary);
+  background: var(--color-accent);
   color: white;
   font-size: 15px;
   font-weight: 600;
   font-family: var(--font-body);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
 }
 
 .error-retry:hover {
-  background: var(--color-primary-light);
+  background: var(--color-accent-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
+.error-retry:active {
+  transform: translateY(0);
+}
+
+/* Footer */
 .footer {
   text-align: center;
-  padding: var(--space-10) var(--space-6);
+  padding: var(--space-12) var(--space-6);
   color: var(--color-text-muted);
   font-size: 13px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-light);
+  background: var(--color-surface);
 }
 
 @media (max-width: 768px) {
   .container {
-    padding: 24px 20px;
+    padding: var(--space-8) var(--space-4);
+  }
+
+  .error-message {
+    padding: var(--space-6);
   }
 }
