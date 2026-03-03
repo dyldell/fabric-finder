@@ -619,6 +619,7 @@ CRITICAL RULES:
 7. Extract the gender (mens, womens, unisex)
 8. Extract the main product image URL if available
 9. Extract performance keywords from product title/description (Tech, Performance, Moisture Wicking, Quick Dry, UPF, Dry Fit, Cooling, Athletic, etc.)
+10. For men's shorts ONLY: Extract the inseam length if specified (e.g., "5\"", "7\"", "9\"") - return as string with quotes (e.g., "5\"")
 
 Example:
 If you see "Pocket Lining: 90% Polyester, 10% Lycra | Body: 71% Nylon, 29% Lycra Elastane"
@@ -626,9 +627,10 @@ Extract ONLY: [{"type": "Nylon", "percentage": 71}, {"type": "Lycra Elastane", "
 
 Return ONLY a valid JSON object with this exact structure:
 {
-  "product_name": "Pace Breaker Short",
+  "product_name": "Pace Breaker Short 7\"",
   "product_type": "shorts",
   "gender": "mens",
+  "inseam": "7\"",
   "product_image": "https://...",
   "fabrics": [
     {"type": "Nylon", "percentage": 87},
@@ -640,6 +642,7 @@ Return ONLY a valid JSON object with this exact structure:
 }
 
 The "keywords" field should contain searchable brand-agnostic terms from the product name/description (Tech, Performance, Sport, Athletic, Dry Fit, etc.) - NOT fabric features.
+The "inseam" field should ONLY be included for men's shorts when an inseam length is found (5", 7", 9", etc.)
 
 Product page content:
 ${scrapedContent}
@@ -1149,10 +1152,18 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
 
   const gender = fabricData.gender || ''
   let type = fabricData.product_type || productType
+  const inseam = fabricData.inseam || '' // Extract inseam for men's shorts
 
   // Women's "pants" in athletic context = leggings
   if (gender === 'womens' && (type === 'pants' || type === 'pant')) {
     type = 'leggings'
+  }
+
+  // For men's shorts, add inseam to type if available
+  let typeWithInseam = type
+  if (gender === 'mens' && (type === 'shorts' || type === 'short') && inseam) {
+    typeWithInseam = `${inseam} ${type}`
+    console.log(`[Search] Men's shorts detected - using inseam: ${inseam}`)
   }
 
   // Get fabric with all alternate names for comprehensive search
@@ -1205,12 +1216,12 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   // Build 2 optimized search queries (reduced from 3 to save API costs)
   const queries = []
 
-  // Query 1: Fabric-based exact match
+  // Query 1: Fabric-based exact match (with inseam for men's shorts)
   queries.push({
     name: 'fabric-exact',
-    query: gender && type
-      ? `${gender} ${type} ${fabricString}`
-      : `${type} ${fabricString}`
+    query: gender && typeWithInseam
+      ? `${gender} ${typeWithInseam} ${fabricString}`
+      : `${typeWithInseam} ${fabricString}`
   })
 
   // Query 2: Keyword-based OR budget search (pick best one)
@@ -1218,17 +1229,17 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     // If we have keywords, use keyword search (better quality)
     queries.push({
       name: 'keyword',
-      query: gender && type
-        ? `${gender} ${type} ${keywordString}`
-        : `${type} ${keywordString}`
+      query: gender && typeWithInseam
+        ? `${gender} ${typeWithInseam} ${keywordString}`
+        : `${typeWithInseam} ${keywordString}`
     })
   } else {
     // No keywords? Fall back to budget search
     queries.push({
       name: 'budget',
-      query: gender && type
-        ? `budget ${gender} ${type} athletic`
-        : `budget ${type} athletic`
+      query: gender && typeWithInseam
+        ? `budget ${gender} ${typeWithInseam} athletic`
+        : `budget ${typeWithInseam} athletic`
     })
   }
 
@@ -1241,8 +1252,8 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
 
   const [amazonPaapiResults, amazonSerpExact, amazonSerpSecond, ...googleShoppingResults] = await Promise.all([
     searchAmazonProducts(fabricData, brand, productType),
-    searchAmazonViaSerpApi(fabricData, brand, productType, fabricExactQuery?.query || `${gender} ${type} athletic`),
-    searchAmazonViaSerpApi(fabricData, brand, productType, secondQuery?.query || `budget ${type} athletic`),
+    searchAmazonViaSerpApi(fabricData, brand, productType, fabricExactQuery?.query || `${gender} ${typeWithInseam} athletic`),
+    searchAmazonViaSerpApi(fabricData, brand, productType, secondQuery?.query || `budget ${typeWithInseam} athletic`),
     ...queries.map(q => searchSerpApiProducts(fabricData, brand, productType, q.query))
   ])
 
