@@ -1,10 +1,5 @@
 /* Premium Navbar - Clean & Minimal */
 .navbar {
-  /* Add safe-area padding for iPhone notch */
-  padding-top: max(var(--space-8), env(safe-area-inset-top));
-  padding-bottom: var(--space-8);
-  padding-left: max(var(--space-6), env(safe-area-inset-left));
-  padding-right: max(var(--space-6), env(safe-area-inset-right));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -19,6 +14,12 @@
   z-index: 100;
   border-bottom: 1px solid var(--color-border-light);
   transition: all 0.3s ease;
+
+  /* Safe-area padding - AGGRESSIVE fix for iPhone notch */
+  padding-top: calc(var(--space-8, 32px) + env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: var(--space-8, 32px);
+  padding-left: max(var(--space-6, 24px), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--space-6, 24px), env(safe-area-inset-right, 0px));
 }
 
 .navbar-logo {
@@ -50,11 +51,11 @@
 
 @media (max-width: 768px) {
   .navbar {
-    /* Maintain safe-area on mobile */
-    padding-top: max(var(--space-6), env(safe-area-inset-top));
-    padding-bottom: var(--space-6);
-    padding-left: max(var(--space-4), env(safe-area-inset-left));
-    padding-right: max(var(--space-4), env(safe-area-inset-right));
+    /* EXTRA padding for mobile notch - force it! */
+    padding-top: calc(var(--space-6, 24px) + env(safe-area-inset-top, 20px)) !important;
+    padding-bottom: var(--space-6, 24px);
+    padding-left: max(var(--space-4, 16px), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--space-4, 16px), env(safe-area-inset-right, 0px));
   }
 
   .navbar-logo {
