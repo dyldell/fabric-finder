@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Routes, Route } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
@@ -6,6 +7,9 @@ import AnalysisForm from './components/AnalysisForm'
 import Results from './components/Results'
 import Footer from './components/Footer'
 import ScanLimitBanner from './components/ScanLimitBanner'
+import PrivacyPolicy from './components/PrivacyPolicy'
+import TermsOfService from './components/TermsOfService'
+import About from './components/About'
 // import InstallPrompt from './components/InstallPrompt' // Disabled - users can still install via browser menu
 import { getUserIdentifiers } from './utils/userTracking'
 import './App.css'
@@ -159,53 +163,59 @@ function App() {
 
   return (
     <div className="app">
-      <Navbar />
-      <Hero />
+      <Routes>
+        {/* Main App Route */}
+        <Route path="/" element={
+          <>
+            <Navbar />
+            <Hero />
+            <main className="container">
+              <ScanLimitBanner isAdmin={isAdmin} />
+              <AnalysisForm
+                onAnalyze={handleAnalyze}
+                loading={loading}
+              />
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="error-message"
+                  >
+                    <div className="error-icon">✕</div>
+                    <div className="error-content">
+                      {error.split('\n\n').map((paragraph, index) => (
+                        <p key={index}>{paragraph}</p>
+                      ))}
+                    </div>
+                    <button
+                      className="error-retry"
+                      onClick={() => {
+                        setError(null)
+                        setResults(null)
+                      }}
+                    >
+                      Try Again
+                    </button>
+                  </motion.div>
+                )}
+                {results && (
+                  <Results key="results" data={results} isAdmin={isAdmin} />
+                )}
+              </AnimatePresence>
+            </main>
+            <Footer />
+          </>
+        } />
 
-      <main className="container">
-        <ScanLimitBanner isAdmin={isAdmin} />
-
-        <AnalysisForm
-          onAnalyze={handleAnalyze}
-          loading={loading}
-        />
-
-        <AnimatePresence mode="wait">
-          {error && (
-            <motion.div
-              key="error"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="error-message"
-            >
-              <div className="error-icon">✕</div>
-              <div className="error-content">
-                {error.split('\n\n').map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
-                ))}
-              </div>
-              <button
-                className="error-retry"
-                onClick={() => {
-                  setError(null)
-                  setResults(null)
-                }}
-              >
-                Try Again
-              </button>
-            </motion.div>
-          )}
-
-          {results && (
-            <Results key="results" data={results} isAdmin={isAdmin} />
-          )}
-        </AnimatePresence>
-      </main>
-
-      <Footer />
-      {/* <InstallPrompt /> */}
+        {/* Legal Pages */}
+        <Route path="/privacy" element={<><PrivacyPolicy /><Footer /></>} />
+        <Route path="/terms" element={<><TermsOfService /><Footer /></>} />
+        <Route path="/about" element={<><About /><Footer /></>} />
+      </Routes>
     </div>
   )
 }

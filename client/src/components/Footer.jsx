@@ -11,6 +11,8 @@ export default function Footer() {
           This helps us keep the service free and continuously improve our fabric analysis technology.
         </p>
         <div className="footer-links">
+          <a href="/about" className="footer-link">About</a>
+          <span className="footer-separator">•</span>
           <a href="/privacy" className="footer-link">Privacy Policy</a>
           <span className="footer-separator">•</span>
           <a href="/terms" className="footer-link">Terms of Service</a>
