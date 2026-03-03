@@ -716,9 +716,9 @@
   </div>
 
   <script type="module">
-    // Supabase configuration (from .env)
-    const SUPABASE_URL = 'https://lqunkwbotsthefuxnvnf.supabase.co'
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxdW5rd2JvdHN0aGVmdXhudm5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMzE2NzIsImV4cCI6MjA4NzcwNzY3Mn0.OMZ3M2MZsSAHGbGT8QfqMUCoSJl6yIkQdl-6gIm0C8c'
+    // Supabase configuration (injected by server from environment variables)
+    const SUPABASE_URL = 'INJECTED_BY_SERVER'
+    const SUPABASE_ANON_KEY = 'INJECTED_BY_SERVER'
 
     // Import Supabase client (CDN)
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
@@ -800,9 +800,10 @@
           const api = row.api_name
           if (!apiStats[api]) return
 
-          apiStats[api].calls += row.call_count
-          apiStats[api].cost += parseFloat(row.estimated_cost)
-          totalCost += parseFloat(row.estimated_cost)
+          const callCount = row.call_count || 1
+          apiStats[api].calls += callCount
+          apiStats[api].cost += parseFloat(row.estimated_cost || 0)
+          totalCost += parseFloat(row.estimated_cost || 0)
 
           if (row.status === 'success') apiStats[api].successCount++
           if (row.status === 'error') apiStats[api].errorCount++
@@ -812,9 +813,10 @@
           }
         })
 
-        // Count unique scans (distinct scan_url)
-        const uniqueScans = new Set(todayData.map(r => r.scan_url))
-        totalScans = uniqueScans.size
+        // Count unique scans based on Firecrawl calls (each scan = 1 Firecrawl call)
+        // This is more accurate than counting distinct URLs (which can be cached)
+        const firecrawlScans = todayData.filter(r => r.api_name === 'firecrawl')
+        totalScans = firecrawlScans.length
 
         // Update hero stats
         animateNumber(document.getElementById('total-scans-today'), totalScans)
@@ -864,7 +866,7 @@
             <div class="api-usage-bar">
               <div class="api-usage-fill" style="width: ${Math.min(usagePercent, 100)}%"></div>
             </div>
-            <div class="api-last-call">${stat.calls} / ${config.freeLimit} searches used</div>
+            <div class="api-last-call">${stat.calls} / ${config.freeLimit} searches used (4 per scan)</div>
           `
         }
 

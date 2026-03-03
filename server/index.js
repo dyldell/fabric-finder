@@ -8,6 +8,9 @@ import compression from 'compression'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import Anthropic from '@anthropic-ai/sdk'
 import FirecrawlApp from '@mendable/firecrawl-js'
 import { createClient } from '@supabase/supabase-js'
@@ -24,6 +27,10 @@ import {
   sanitizeError
 } from './security-config.js'
 import { isValidAdminKey } from './admin-config.js'
+
+// ES module __dirname equivalent
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -1909,6 +1916,48 @@ app.post('/api/admin/verify', adminAuthLimiter, (req, res) => {
 app.get('/api/admin/status', (req, res) => {
   const isAdmin = req.cookies.admin_session === 'true'
   res.json({ isAdmin })
+})
+
+/**
+ * Dashboard endpoint - serves dashboard with environment variables injected
+ * Access: /dashboard (requires admin authentication)
+ */
+app.get('/dashboard', (req, res) => {
+  // Check if user is admin
+  const isAdmin = req.cookies.admin_session === 'true'
+
+  if (!isAdmin) {
+    return res.status(403).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Access Denied</title></head>
+      <body style="font-family: system-ui; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+        <div style="text-align: center;">
+          <h1>🔒 Access Denied</h1>
+          <p>This dashboard requires admin authentication.</p>
+          <a href="/?key=YOUR_ADMIN_KEY" style="color: #00F5FF;">Login as Admin</a>
+        </div>
+      </body>
+      </html>
+    `)
+  }
+
+  // Read dashboard HTML and inject environment variables
+  const dashboardPath = path.join(__dirname, '../dashboard/index.html')
+  let html = fs.readFileSync(dashboardPath, 'utf8')
+
+  // Replace hardcoded credentials with environment variables
+  html = html.replace(
+    /const SUPABASE_URL = '[^']*'/,
+    `const SUPABASE_URL = '${process.env.SUPABASE_URL}'`
+  )
+  html = html.replace(
+    /const SUPABASE_ANON_KEY = '[^']*'/,
+    `const SUPABASE_ANON_KEY = '${process.env.SUPABASE_ANON_KEY}'`
+  )
+
+  res.setHeader('Content-Type', 'text/html')
+  res.send(html)
 })
 
 // Serve static files in production
