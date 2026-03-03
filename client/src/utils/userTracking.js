@@ -60,14 +60,31 @@ export async function getBrowserFingerprint() {
 
 /**
  * Simple hash function
+ * Falls back to simple string hash if crypto.subtle unavailable (non-HTTPS)
  */
 async function simpleHash(str) {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(str)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-  return hashHex.substring(0, 16)
+  // Check if crypto.subtle is available (requires HTTPS or localhost)
+  if (window.crypto && window.crypto.subtle) {
+    try {
+      const encoder = new TextEncoder()
+      const data = encoder.encode(str)
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+      return hashHex.substring(0, 16)
+    } catch (e) {
+      console.warn('crypto.subtle failed, using fallback hash')
+    }
+  }
+
+  // Fallback: simple string hash for non-HTTPS contexts
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(16, '0').substring(0, 16)
 }
 
 /**
