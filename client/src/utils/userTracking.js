@@ -88,12 +88,20 @@ async function simpleHash(str) {
 }
 
 /**
- * Set cookie
+ * Set cookie with error handling
  */
 function setCookie(name, value, days = 365) {
-  const expires = new Date()
-  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
-  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`
+  try {
+    const expires = new Date()
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
+    // SameSite=None requires Secure flag, but we can't use Secure on HTTP
+    // So use SameSite=Lax for non-HTTPS contexts
+    const sameSite = window.location.protocol === 'https:' ? 'None; Secure' : 'Lax'
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=${sameSite}`
+  } catch (error) {
+    console.warn('Cookie set failed:', error.message)
+    // Cookies may fail on some mobile browsers, but app will still work via localStorage
+  }
 }
 
 /**
