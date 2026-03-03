@@ -1,0 +1,108 @@
+/* Shared Legal Page Styles */
+.legal-page {
+  min-height: 100vh;
+  background: var(--color-background, #fafafa);
+  padding: var(--space-12, 48px) var(--space-6, 24px);
+}
+
+.legal-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  padding: var(--space-12, 48px);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: var(--shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.1));
+}
+
+.legal-container h1 {
+  font-family: var(--font-display, 'Inter', sans-serif);
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--color-text-primary, #1a1a1a);
+  margin-bottom: var(--space-4, 16px);
+  line-height: 1.2;
+}
+
+.legal-updated {
+  font-size: 14px;
+  color: var(--color-text-muted, #6b7280);
+  margin-bottom: var(--space-10, 40px);
+  padding-bottom: var(--space-6, 24px);
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+}
+
+.legal-container h2 {
+  font-family: var(--font-display, 'Inter', sans-serif);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+  margin-top: var(--space-10, 40px);
+  margin-bottom: var(--space-4, 16px);
+  line-height: 1.3;
+}
+
+.legal-container section {
+  margin-bottom: var(--space-8, 32px);
+}
+
+.legal-container p {
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #4b5563);
+  margin-bottom: var(--space-4, 16px);
+}
+
+.legal-container ul,
+.legal-container ol {
+  margin-left: var(--space-6, 24px);
+  margin-bottom: var(--space-4, 16px);
+}
+
+.legal-container li {
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #4b5563);
+  margin-bottom: var(--space-2, 8px);
+}
+
+.legal-container a {
+  color: var(--color-accent, #3b82f6);
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.legal-container a:hover {
+  color: var(--color-accent-dark, #2563eb);
+}
+
+.legal-container strong {
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .legal-page {
+    padding: var(--space-8, 32px) var(--space-4, 16px);
+  }
+
+  .legal-container {
+    padding: var(--space-8, 32px) var(--space-6, 24px);
+  }
+
+  .legal-container h1 {
+    font-size: 28px;
+  }
+
+  .legal-container h2 {
+    font-size: 20px;
+    margin-top: var(--space-8, 32px);
+  }
+
+  .legal-container p,
+  .legal-container li {
+    font-size: 15px;
+  }
+}
