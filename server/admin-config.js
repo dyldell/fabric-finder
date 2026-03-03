@@ -3,7 +3,13 @@
  * Handles admin secret key validation for unlimited access
  */
 
-export const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || 'change-me-in-production'
+/**
+ * Get admin secret key (checked at runtime, not import time)
+ * @returns {string} - The admin secret key
+ */
+function getAdminSecretKey() {
+  return process.env.ADMIN_SECRET_KEY || 'change-me-in-production'
+}
 
 /**
  * Validates admin access key
@@ -11,10 +17,9 @@ export const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || 'change-me-in-pr
  * @returns {boolean} - Whether the key is valid
  */
 export function isValidAdminKey(key) {
-  return key === ADMIN_SECRET_KEY
+  return key === getAdminSecretKey()
 }
 
 export default {
-  ADMIN_SECRET_KEY,
   isValidAdminKey
 }

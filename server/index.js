@@ -1,10 +1,13 @@
+import dotenv from 'dotenv'
+// Load .env FIRST before any other imports that use env vars
+dotenv.config()
+
 import express from 'express'
 import cors from 'cors'
 import compression from 'compression'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import cookieParser from 'cookie-parser'
-import dotenv from 'dotenv'
 import Anthropic from '@anthropic-ai/sdk'
 import FirecrawlApp from '@mendable/firecrawl-js'
 import { createClient } from '@supabase/supabase-js'
@@ -21,8 +24,6 @@ import {
   sanitizeError
 } from './security-config.js'
 import { isValidAdminKey } from './admin-config.js'
-
-dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3000
