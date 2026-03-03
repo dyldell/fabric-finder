@@ -157,6 +157,190 @@ async function checkCostLimit(req, res, next) {
   }
 }
 
+// ============================================================================
+// USER SCAN TRACKING (Anonymous)
+// ============================================================================
+
+const MAX_FREE_SCANS = 3
+
+/**
+ * Get current month identifier (YYYY-MM)
+ */
+function getCurrentMonth() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Check if user is admin (whitelisted)
+ */
+async function isAdminUser(userId) {
+  try {
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('user_id')
+      .eq('user_id', userId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error('[Admin Check Error]:', error)
+      return false
+    }
+
+    return !!data
+  } catch (error) {
+    console.error('[Admin Check Error]:', error)
+    return false
+  }
+}
+
+/**
+ * Get user scan count for current month
+ */
+async function getUserScanCount(userId, fingerprint) {
+  try {
+    const currentMonth = getCurrentMonth()
+
+    // Try to find by userId first
+    let { data, error } = await supabase
+      .from('user_scans')
+      .select('scan_count')
+      .eq('user_id', userId)
+      .eq('scan_month', currentMonth)
+      .single()
+
+    // If not found by userId, try fingerprint (backup for users who cleared cookies)
+    if ((error && error.code === 'PGRST116') && fingerprint) {
+      const fpResult = await supabase
+        .from('user_scans')
+        .select('scan_count, user_id')
+        .eq('fingerprint', fingerprint)
+        .eq('scan_month', currentMonth)
+        .single()
+
+      if (fpResult.data) {
+        console.log('[Scan Tracking] Found user by fingerprint, updating userId')
+        // Update the record with the new userId
+        await supabase
+          .from('user_scans')
+          .update({ user_id: userId })
+          .eq('fingerprint', fingerprint)
+          .eq('scan_month', currentMonth)
+
+        data = fpResult.data
+        error = fpResult.error
+      }
+    }
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('[Scan Count Error]:', error)
+      return 0
+    }
+
+    return data ? data.scan_count : 0
+  } catch (error) {
+    console.error('[Scan Count Error]:', error)
+    return 0
+  }
+}
+
+/**
+ * Increment user scan count
+ */
+async function incrementUserScanCount(userId, fingerprint) {
+  try {
+    const currentMonth = getCurrentMonth()
+
+    // Upsert: increment if exists, create if not
+    const { error } = await supabase
+      .from('user_scans')
+      .upsert(
+        {
+          user_id: userId,
+          fingerprint: fingerprint,
+          scan_month: currentMonth,
+          scan_count: 1,
+          last_scan_at: new Date().toISOString()
+        },
+        {
+          onConflict: 'user_id,scan_month',
+          ignoreDuplicates: false
+        }
+      )
+      .select()
+
+    // If upsert didn't work (record exists), increment manually
+    if (error || !error) {
+      await supabase.rpc('increment_scan_count', {
+        p_user_id: userId,
+        p_scan_month: currentMonth,
+        p_fingerprint: fingerprint
+      }).catch(async () => {
+        // Fallback: manual increment
+        const currentCount = await getUserScanCount(userId, fingerprint)
+        await supabase
+          .from('user_scans')
+          .update({
+            scan_count: currentCount + 1,
+            last_scan_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('scan_month', currentMonth)
+      })
+    }
+
+    return true
+  } catch (error) {
+    console.error('[Increment Scan Error]:', error)
+    return false
+  }
+}
+
+/**
+ * Middleware: Check user scan limit
+ */
+async function checkScanLimit(req, res, next) {
+  try {
+    const { userId, fingerprint } = req.body
+
+    if (!userId) {
+      return res.status(400).json({
+        error: 'User identification required',
+        message: 'Please enable cookies to use this service.'
+      })
+    }
+
+    // Check if user is admin
+    const isAdmin = await isAdminUser(userId)
+    if (isAdmin) {
+      console.log('[Scan Limit] Admin user - bypassing limit')
+      req.isAdmin = true
+      return next()
+    }
+
+    // Check scan count
+    const scanCount = await getUserScanCount(userId, fingerprint)
+
+    if (scanCount >= MAX_FREE_SCANS) {
+      return res.status(429).json({
+        error: 'Scan limit exceeded',
+        message: `You've used all ${MAX_FREE_SCANS} free scans this month. Upgrade to Premium for unlimited scans.`,
+        upgradeUrl: '/premium',
+        scansUsed: scanCount,
+        scansMax: MAX_FREE_SCANS
+      })
+    }
+
+    // Store for later increment
+    req.userTracking = { userId, fingerprint }
+    next()
+  } catch (error) {
+    console.error('[Scan Limit Check Error]:', error)
+    // Don't block on error - allow scan but log it
+    next()
+  }
+}
+
 // Initialize Anthropic client
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -546,8 +730,8 @@ Return ONLY the JSON object, no other text.`
 }
 
 // API Routes
-// Apply security middleware: cost limit → burst limit → hourly limit → URL validation
-app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, validateUrl, async (req, res) => {
+// Apply security middleware: cost limit → burst limit → hourly limit → scan limit → URL validation
+app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanLimit, validateUrl, async (req, res) => {
   try {
     const { url, refresh } = req.body
 
@@ -589,6 +773,12 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, validateUr
         cachedData.brand,
         cachedData.product_type || 'athletic wear'
       )
+
+      // Increment scan count for cached hits too (fire and forget)
+      if (req.userTracking && !req.isAdmin) {
+        incrementUserScanCount(req.userTracking.userId, req.userTracking.fingerprint)
+          .catch(err => console.error('[Scan Count Increment Error]:', err))
+      }
 
       return res.json({
         product_name: cachedData.product_name,
@@ -720,6 +910,12 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, validateUr
       brand,
       cached: false
     })
+
+    // Increment scan count after successful scan (don't await - fire and forget)
+    if (req.userTracking && !req.isAdmin) {
+      incrementUserScanCount(req.userTracking.userId, req.userTracking.fingerprint)
+        .catch(err => console.error('[Scan Count Increment Error]:', err))
+    }
 
   } catch (error) {
     console.error('[API Error]:', error) // Full error logged server-side
@@ -1353,7 +1549,7 @@ function generateFallbackAlternatives(fabricData, brand, productType = 'athletic
 
 // Streaming version of /api/analyze using Server-Sent Events (SSE)
 // Apply security middleware: cost limit → burst limit → hourly limit → URL validation
-app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, validateUrl, async (req, res) => {
+app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, checkScanLimit, validateUrl, async (req, res) => {
   try {
     const { url, refresh } = req.body
 
@@ -1536,6 +1732,12 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, val
     sendEvent('alternatives', { alternatives })
     sendEvent('complete', { cached: false, scanTime: totalTime })
     res.end()
+
+    // Increment scan count after successful scan (don't await - fire and forget)
+    if (req.userTracking && !req.isAdmin) {
+      incrementUserScanCount(req.userTracking.userId, req.userTracking.fingerprint)
+        .catch(err => console.error('[Scan Count Increment Error]:', err))
+    }
 
   } catch (error) {
     console.error('[Streaming API Error]:', error) // Full error logged server-side

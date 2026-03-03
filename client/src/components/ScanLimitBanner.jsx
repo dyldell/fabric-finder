@@ -16,7 +16,7 @@ export default function ScanLimitBanner({ isAdmin }) {
         <div className="limit-content">
           <span className="limit-icon">⚠️</span>
           <div className="limit-text">
-            <strong>You've used all 5 free scans this month</strong>
+            <strong>You've used all 3 free scans this month</strong>
             <p>Upgrade to Premium for unlimited scans, no ads, and priority support</p>
           </div>
         </div>
@@ -28,7 +28,7 @@ export default function ScanLimitBanner({ isAdmin }) {
   }
 
   // Low scans remaining - show warning
-  if (remaining <= 2) {
+  if (remaining <= 1) {
     return (
       <div className="limit-banner limit-warning">
         <div className="limit-content">

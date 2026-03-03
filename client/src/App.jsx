@@ -7,7 +7,7 @@ import Results from './components/Results'
 import Footer from './components/Footer'
 import ScanLimitBanner from './components/ScanLimitBanner'
 // import InstallPrompt from './components/InstallPrompt' // Disabled - users can still install via browser menu
-import { canScan, incrementScanCount } from './utils/scanTracking'
+import { getUserIdentifiers } from './utils/userTracking'
 import './App.css'
 
 function App() {
@@ -54,14 +54,6 @@ function App() {
   }, [])
 
   const handleAnalyze = async (url, refresh = false) => {
-    // Check scan limit for free users (skip for admin)
-    if (!isAdmin && !canScan()) {
-      setError(
-        'You\'ve reached the free tier limit (5 scans/month). Upgrade to Premium for unlimited scans.\n\nPremium benefits: Unlimited scans • No ads • Priority support • Only $9.99/month'
-      )
-      return
-    }
-
     setLoading(true)
     setError(null)
     if (!refresh) {
@@ -69,13 +61,16 @@ function App() {
     }
 
     try {
+      // Get user identifiers for tracking (userId + fingerprint)
+      const { userId, fingerprint } = await getUserIdentifiers()
+
       // Use streaming endpoint for real-time updates
       const response = await fetch('/api/analyze-stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url, refresh }),
+        body: JSON.stringify({ url, refresh, userId, fingerprint }),
         credentials: 'include'  // Include admin cookie
       })
 
@@ -136,11 +131,7 @@ function App() {
                     setResults({ ...fabricData, alternatives })
                   }
                   setCurrentUrl(url)
-
-                  // Increment scan count for free users (skip for admin)
-                  if (!isAdmin) {
-                    incrementScanCount()
-                  }
+                  // Scan count is now tracked server-side
                 } else if (eventType === 'error') {
                   throw new Error(data.message || 'Analysis failed')
                 }

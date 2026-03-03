@@ -6,7 +6,7 @@
 
 const SCANS_KEY = 'fabricfinder_scans'
 const MONTH_KEY = 'fabricfinder_month'
-const MAX_FREE_SCANS = 5
+const MAX_FREE_SCANS = 3
 
 /**
  * Get current month identifier (YYYY-MM)
