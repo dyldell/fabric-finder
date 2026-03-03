@@ -119,12 +119,12 @@ function getCookie(name) {
  * Checks: Cookie → localStorage → generates new
  */
 export async function getUserId() {
-  // Check cookie first
-  let userId = getCookie(USER_ID_COOKIE)
+  // Check localStorage first (more reliable on mobile)
+  let userId = localStorage.getItem(USER_ID_KEY)
 
-  // Check localStorage
+  // Check cookie as backup
   if (!userId) {
-    userId = localStorage.getItem(USER_ID_KEY)
+    userId = getCookie(USER_ID_COOKIE)
   }
 
   // Generate new if none found
@@ -132,9 +132,11 @@ export async function getUserId() {
     userId = generateUserId()
   }
 
-  // Store in both places
-  setCookie(USER_ID_COOKIE, userId, 365)
+  // Store in localStorage (primary)
   localStorage.setItem(USER_ID_KEY, userId)
+
+  // Try to store in cookie (optional, may fail on mobile HTTP)
+  setCookie(USER_ID_COOKIE, userId, 365)
 
   return userId
 }
