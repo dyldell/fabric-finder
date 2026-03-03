@@ -27,9 +27,14 @@ function App() {
     const adminKey = urlParams.get('key')
 
     if (adminKey) {
-      // Verify admin key
-      fetch(`/api/admin/verify?key=${adminKey}`, {
-        credentials: 'include'  // Include cookies
+      // Verify admin key via POST (secure)
+      fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',  // Include cookies
+        body: JSON.stringify({ key: adminKey })
       })
         .then(res => res.json())
         .then(data => {

@@ -105,6 +105,16 @@ const hourlyLimiter = rateLimit({
   skip: skipAdminRateLimit
 })
 
+// Admin authentication rate limiter: 5 attempts per 15 minutes (brute force protection)
+const adminAuthLimiter = rateLimit({
+  windowMs: RATE_LIMITS.adminAuth.windowMs,
+  max: RATE_LIMITS.adminAuth.max,
+  message: RATE_LIMITS.adminAuth.message,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true  // Only count failed attempts
+})
+
 // ============================================================================
 // VALIDATION MIDDLEWARE
 // ============================================================================
@@ -355,7 +365,21 @@ const firecrawl = new FirecrawlApp({
 // Initialize Supabase client (use SERVICE_KEY for server-side operations)
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY,
+  {
+    db: {
+      pooler: {
+        min: 2,                      // Minimum connections in pool
+        max: 10,                     // Maximum connections (fits Supabase free tier 20 connection limit)
+        idleTimeoutMillis: 30000     // Close idle connections after 30 seconds
+      }
+    },
+    global: {
+      headers: {
+        'x-application-name': 'fabricfinder'  // Identify connections in Supabase dashboard
+      }
+    }
+  }
 )
 
 // Normalize URL for matching (remove query params, trailing slashes)
@@ -736,15 +760,28 @@ Return ONLY the JSON object, no other text.`
 // API Routes
 // Apply security middleware: cost limit → burst limit → hourly limit → scan limit → URL validation
 app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanLimit, validateUrl, async (req, res) => {
+  // Set request timeout (60 seconds) to prevent hung requests
+  const requestTimeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.error('[Timeout] Request exceeded 60 second limit')
+      res.status(504).json({
+        error: 'Request timeout',
+        message: 'Analysis took too long. This could happen if the product page is very complex. Please try again or try a different URL.'
+      })
+    }
+  }, 60000) // 60 second timeout
+
   try {
     const { url, refresh } = req.body
 
     if (!url) {
+      clearTimeout(requestTimeout)
       return res.status(400).json({ error: 'URL is required' })
     }
 
     // Validate Lululemon URLs - www.lululemon.com/products/ URLs often redirect incorrectly
     if (url.includes('www.lululemon.com/products/')) {
+      clearTimeout(requestTimeout)
       return res.status(400).json({
         error: 'Invalid Lululemon URL format',
         message: 'Please use shop.lululemon.com URLs instead of www.lululemon.com/products/. Example: https://shop.lululemon.com/p/women-pants/Align-Pant-2/_/prod8780551',
@@ -784,6 +821,7 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanL
           .catch(err => console.error('[Scan Count Increment Error]:', err))
       }
 
+      clearTimeout(requestTimeout)
       return res.json({
         product_name: cachedData.product_name,
         product_type: cachedData.product_type,
@@ -812,6 +850,7 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanL
         responseTime: firecrawlTime,
         status: 'error'
       })
+      clearTimeout(requestTimeout)
       return res.status(500).json({
         error: sanitizeError('Failed to scrape product page')
       })
@@ -907,6 +946,9 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanL
       scanTime: totalTime
     })
 
+    // Clear timeout before sending response
+    clearTimeout(requestTimeout)
+
     // Return results
     res.json({
       ...fabricData,
@@ -922,8 +964,11 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanL
     }
 
   } catch (error) {
+    clearTimeout(requestTimeout)
     console.error('[API Error]:', error) // Full error logged server-side
-    res.status(500).json({ error: sanitizeError(error) }) // Generic error sent to client
+    if (!res.headersSent) {
+      res.status(500).json({ error: sanitizeError(error) }) // Generic error sent to client
+    }
   }
 })
 
@@ -1562,15 +1607,37 @@ function generateFallbackAlternatives(fabricData, brand, productType = 'athletic
 // Streaming version of /api/analyze using Server-Sent Events (SSE)
 // Apply security middleware: cost limit → burst limit → hourly limit → URL validation
 app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, checkScanLimit, validateUrl, async (req, res) => {
+  // Set request timeout (60 seconds) to prevent hung requests
+  const requestTimeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.error('[Timeout] Streaming request exceeded 60 second limit')
+      res.status(504).json({
+        error: 'Request timeout',
+        message: 'Analysis took too long. This could happen if the product page is very complex. Please try again or try a different URL.'
+      })
+    } else {
+      // SSE already started - send error event and close
+      try {
+        res.write(`event: error\n`)
+        res.write(`data: ${JSON.stringify({ message: 'Request timeout - analysis took too long' })}\n\n`)
+        res.end()
+      } catch (e) {
+        // Connection may already be closed
+      }
+    }
+  }, 60000) // 60 second timeout
+
   try {
     const { url, refresh } = req.body
 
     if (!url) {
+      clearTimeout(requestTimeout)
       return res.status(400).json({ error: 'URL is required' })
     }
 
     // Validate Lululemon URLs
     if (url.includes('www.lululemon.com/products/')) {
+      clearTimeout(requestTimeout)
       return res.status(400).json({
         error: 'Invalid Lululemon URL format',
         message: 'Please use shop.lululemon.com URLs instead of www.lululemon.com/products/.'
@@ -1634,6 +1701,7 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
 
       sendEvent('alternatives', { alternatives })
       sendEvent('complete', { cached: true, cached_at: cachedData.scraped_at })
+      clearTimeout(requestTimeout)
       res.end()
       return
     }
@@ -1646,6 +1714,7 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
 
     if (!scrapedData.success) {
       sendEvent('error', { message: sanitizeError('Failed to scrape product page') })
+      clearTimeout(requestTimeout)
       res.end()
       return
     }
@@ -1743,6 +1812,7 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
     // Send alternatives and complete
     sendEvent('alternatives', { alternatives })
     sendEvent('complete', { cached: false, scanTime: totalTime })
+    clearTimeout(requestTimeout)
     res.end()
 
     // Increment scan count after successful scan (don't await - fire and forget)
@@ -1752,10 +1822,15 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
     }
 
   } catch (error) {
+    clearTimeout(requestTimeout)
     console.error('[Streaming API Error]:', error) // Full error logged server-side
-    res.write(`event: error\n`)
-    res.write(`data: ${JSON.stringify({ message: sanitizeError(error) })}\n\n`) // Generic error sent to client
-    res.end()
+    try {
+      res.write(`event: error\n`)
+      res.write(`data: ${JSON.stringify({ message: sanitizeError(error) })}\n\n`) // Generic error sent to client
+      res.end()
+    } catch (e) {
+      // Connection may already be closed
+    }
   }
 })
 
@@ -1796,10 +1871,14 @@ app.get('/health', (req, res) => {
  * Usage: fabricfinder.fit/admin?key=YOUR_SECRET_KEY
  * Sets httpOnly cookie that persists for 90 days
  */
-app.get('/api/admin/verify', (req, res) => {
-  const { key } = req.query
+app.post('/api/admin/verify', adminAuthLimiter, (req, res) => {
+  const { key } = req.body
 
   if (!key || !isValidAdminKey(key)) {
+    // Log failed attempt with IP and timestamp
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'
+    console.log(`[ADMIN] Failed authentication attempt from IP: ${clientIp} at ${new Date().toISOString()}`)
+
     return res.status(401).json({
       isAdmin: false,
       error: 'Invalid admin key'
@@ -1814,7 +1893,8 @@ app.get('/api/admin/verify', (req, res) => {
     sameSite: 'strict'
   })
 
-  console.log('[ADMIN] Admin access granted')
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'
+  console.log(`[ADMIN] Admin access granted to IP: ${clientIp} at ${new Date().toISOString()}`)
 
   res.json({
     isAdmin: true,

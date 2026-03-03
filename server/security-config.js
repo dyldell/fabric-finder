@@ -80,6 +80,16 @@ export const RATE_LIMITS = {
       error: 'Rate limit exceeded',
       message: 'You have exceeded your API limit. Please contact support.'
     }
+  },
+
+  // Admin authentication: prevent brute force attacks
+  adminAuth: {
+    windowMs: 15 * 60 * 1000,        // 15 minutes
+    max: 5,                           // 5 attempts per 15 minutes
+    message: {
+      error: 'Too many authentication attempts',
+      message: 'Too many failed login attempts. Please try again in 15 minutes.'
+    }
   }
 }
 
