@@ -1,6 +1,10 @@
 /* Premium Navbar - Clean & Minimal */
 .navbar {
-  padding: var(--space-8) var(--space-6);
+  /* Add safe-area padding for iPhone notch */
+  padding-top: max(var(--space-8), env(safe-area-inset-top));
+  padding-bottom: var(--space-8);
+  padding-left: max(var(--space-6), env(safe-area-inset-left));
+  padding-right: max(var(--space-6), env(safe-area-inset-right));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -46,7 +50,11 @@
 
 @media (max-width: 768px) {
   .navbar {
-    padding: var(--space-6) var(--space-4);
+    /* Maintain safe-area on mobile */
+    padding-top: max(var(--space-6), env(safe-area-inset-top));
+    padding-bottom: var(--space-6);
+    padding-left: max(var(--space-4), env(safe-area-inset-left));
+    padding-right: max(var(--space-4), env(safe-area-inset-right));
   }
 
   .navbar-logo {
