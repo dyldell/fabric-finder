@@ -421,6 +421,30 @@
   font-weight: 700;
 }
 
+/* Admin Badge */
+.admin-badge {
+  display: inline-block;
+  margin-left: var(--space-3);
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: middle;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  animation: adminPulse 2s ease-in-out infinite;
+}
+
+@keyframes adminPulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  }
+  50% {
+    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.5);
+  }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .results-card {

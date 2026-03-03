@@ -1,0 +1,335 @@
+/**
+ * Mobile Optimization for Fabric Finder
+ * Target: 40-65 age group
+ * Focus: Large text, high contrast, easy touch targets
+ */
+
+/* ============================================================================
+   MOBILE-FIRST IMPROVEMENTS
+   ============================================================================ */
+
+/* Ensure minimum touch target size (Apple/Google recommend 44x44px) */
+@media (max-width: 768px) {
+  /* Buttons - Larger for easier tapping */
+  button,
+  .btn,
+  .upgrade-btn,
+  .upgrade-btn-small,
+  .error-retry {
+    min-height: 48px;
+    min-width: 48px;
+    padding: 14px 24px;
+    font-size: 16px;
+  }
+
+  /* Form inputs - Larger and easier to read */
+  input[type="text"],
+  input[type="url"],
+  input[type="email"],
+  textarea {
+    min-height: 52px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+    padding: 14px 16px;
+  }
+
+  /* Links - Larger touch targets */
+  a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+  }
+
+  /* Navigation links */
+  nav a {
+    padding: 12px 16px;
+    font-size: 16px;
+  }
+
+  /* Product cards - Easier to tap */
+  .product-card {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  /* Larger text for 40-65 age group */
+  body {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  h1 {
+    font-size: 32px;
+    line-height: 1.3;
+  }
+
+  h2 {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+
+  h3 {
+    font-size: 20px;
+    line-height: 1.4;
+  }
+
+  p {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  /* High contrast for readability */
+  .text-primary {
+    color: #1a1a1a;
+  }
+
+  .text-secondary {
+    color: #4a5568;
+  }
+
+  /* Spacing for thumb-friendly zones */
+  .container {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  /* Bottom navigation area (safe zone) */
+  .footer {
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+  }
+
+  /* Top safe area (for notched phones) */
+  .navbar {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+}
+
+/* ============================================================================
+   LANDSCAPE MODE (Phone rotated)
+   ============================================================================ */
+
+@media (max-width: 768px) and (orientation: landscape) {
+  /* Reduce vertical spacing in landscape */
+  .container {
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-6);
+  }
+
+  /* Compact header */
+  .hero {
+    padding: var(--space-6) 0;
+  }
+
+  h1 {
+    font-size: 28px;
+  }
+}
+
+/* ============================================================================
+   SMALL PHONES (iPhone SE, etc.)
+   ============================================================================ */
+
+@media (max-width: 375px) {
+  h1 {
+    font-size: 28px;
+  }
+
+  h2 {
+    font-size: 22px;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr; /* Single column on very small screens */
+  }
+
+  /* Slightly smaller buttons on tiny screens */
+  button,
+  .btn {
+    font-size: 15px;
+    padding: 12px 20px;
+  }
+}
+
+/* ============================================================================
+   TOUCH-FRIENDLY INTERACTIONS
+   ============================================================================ */
+
+/* Remove hover effects on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  button:hover,
+  .btn:hover,
+  a:hover {
+    transform: none;
+  }
+
+  /* Add active/pressed states instead */
+  button:active,
+  .btn:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+
+  a:active {
+    opacity: 0.7;
+  }
+}
+
+/* ============================================================================
+   PWA SPECIFIC (When installed as app)
+   ============================================================================ */
+
+@media (display-mode: standalone) {
+  /* Hide URL bar notice when installed */
+  .install-prompt {
+    display: none;
+  }
+
+  /* Add extra padding for status bar */
+  .app {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Full screen experience */
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+/* ============================================================================
+   LOADING STATES (Mobile data can be slow)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  /* Skeleton loading for better perceived performance */
+  .loading-skeleton {
+    background: linear-gradient(
+      90deg,
+      #f0f0f0 25%,
+      #e0e0e0 50%,
+      #f0f0f0 75%
+    );
+    background-size: 200% 100%;
+    animation: loading 1.5s ease-in-out infinite;
+  }
+
+  @keyframes loading {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* ============================================================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  /* Larger focus indicators for better visibility */
+  button:focus,
+  input:focus,
+  a:focus {
+    outline: 3px solid #3b82f6;
+    outline-offset: 2px;
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    body {
+      color: #000000;
+      background: #ffffff;
+    }
+
+    button,
+    .btn {
+      border: 2px solid #000000;
+    }
+  }
+
+  /* Reduced motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ============================================================================
+   FORM OPTIMIZATION
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  /* Prevent zoom on iOS when focusing inputs */
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* Must be 16px to prevent zoom */
+  }
+
+  /* Better spacing around forms */
+  form {
+    padding: 20px 0;
+  }
+
+  label {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* Error messages more prominent */
+  .error-message {
+    font-size: 15px;
+    padding: 16px;
+    border-width: 2px;
+  }
+}
+
+/* ============================================================================
+   SCROLL IMPROVEMENTS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Better scroll snap for cards */
+  .product-grid {
+    scroll-snap-type: y proximity;
+  }
+
+  .product-card {
+    scroll-snap-align: start;
+  }
+
+  /* Pull-to-refresh area */
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* ============================================================================
+   NETWORK-AWARE STYLES
+   ============================================================================ */
+
+/* Reduce animations on slow connections */
+@media (prefers-reduced-data: reduce) {
+  * {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+  }
+
+  /* Don't load background images */
+  [style*="background-image"] {
+    background-image: none !important;
+  }
+}

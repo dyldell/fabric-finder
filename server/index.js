@@ -1,23 +1,161 @@
 import express from 'express'
 import cors from 'cors'
 import compression from 'compression'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
+import cookieParser from 'cookie-parser'
 import dotenv from 'dotenv'
 import Anthropic from '@anthropic-ai/sdk'
 import FirecrawlApp from '@mendable/firecrawl-js'
 import { createClient } from '@supabase/supabase-js'
 import SerpApi from 'google-search-results-nodejs'
 import amazonPaapi from 'amazon-paapi'
-import { trackApiCall, printApiSummary } from '../dashboard/tracker.js'
+import { trackApiCall, printApiSummary, getTodaysCost } from '../dashboard/tracker.js'
+import {
+  ALLOWED_ORIGINS,
+  RATE_LIMITS,
+  HELMET_CONFIG,
+  MAX_REQUEST_SIZE,
+  DAILY_COST_LIMIT,
+  isValidScrapeUrl,
+  sanitizeError
+} from './security-config.js'
+import { isValidAdminKey } from './admin-config.js'
 
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 3000
 
-// Middleware
-app.use(compression()) // Gzip compression for all responses
-app.use(cors())
-app.use(express.json())
+// ============================================================================
+// SECURITY MIDDLEWARE
+// ============================================================================
+
+// 1. Security headers (helmet)
+app.use(helmet(HELMET_CONFIG))
+
+// 2. Request size limit (DoS prevention)
+app.use(express.json({ limit: MAX_REQUEST_SIZE }))
+
+// 3. Cookie parser (for admin sessions)
+app.use(cookieParser())
+
+// 4. Gzip compression
+app.use(compression())
+
+// 5. CORS whitelist
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true)
+
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true  // Allow cookies to be sent
+}))
+
+// 6. HTTPS enforcement (production only)
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.headers['x-forwarded-proto'] !== 'https') {
+      return res.redirect(301, `https://${req.headers.host}${req.url}`)
+    }
+    next()
+  })
+}
+
+// ============================================================================
+// RATE LIMITING
+// ============================================================================
+
+// Dual rate limiting: both burst (15min) and hourly limits
+// Free users must pass BOTH limiters
+// Admin users bypass all rate limits
+
+/**
+ * Skip rate limiting for admin users
+ * Checks for admin_session cookie
+ */
+const skipAdminRateLimit = (req, res) => {
+  return req.cookies.admin_session === 'true'
+}
+
+// Burst protection: 10 requests per 15 minutes
+const burstLimiter = rateLimit({
+  windowMs: RATE_LIMITS.freeBurst.windowMs,
+  max: RATE_LIMITS.freeBurst.max,
+  message: RATE_LIMITS.freeBurst.message,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipAdminRateLimit
+})
+
+// Hourly limit: 20 requests per hour
+const hourlyLimiter = rateLimit({
+  windowMs: RATE_LIMITS.freeHourly.windowMs,
+  max: RATE_LIMITS.freeHourly.max,
+  message: RATE_LIMITS.freeHourly.message,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipAdminRateLimit
+})
+
+// ============================================================================
+// VALIDATION MIDDLEWARE
+// ============================================================================
+
+/**
+ * Validates product URL before processing
+ * Prevents SSRF attacks by checking domain allowlist and blocking internal IPs
+ */
+function validateUrl(req, res, next) {
+  const { url } = req.body
+
+  if (!url) {
+    return res.status(400).json({
+      error: 'URL is required',
+      message: 'Please provide a product URL to analyze.'
+    })
+  }
+
+  const validation = isValidScrapeUrl(url)
+  if (!validation.valid) {
+    return res.status(400).json({
+      error: 'Invalid URL',
+      message: validation.error
+    })
+  }
+
+  next()
+}
+
+/**
+ * Cost monitoring kill switch
+ * Blocks requests if daily cost limit is exceeded ($50/day)
+ */
+async function checkCostLimit(req, res, next) {
+  try {
+    const todaysCost = await getTodaysCost()
+
+    if (todaysCost >= DAILY_COST_LIMIT) {
+      console.error(`[COST ALERT] Daily limit exceeded: $${todaysCost.toFixed(2)}`)
+      return res.status(503).json({
+        error: 'Service temporarily unavailable',
+        message: 'Our service is currently at capacity. Please try again later.'
+      })
+    }
+
+    next()
+  } catch (error) {
+    // Don't block request if cost check fails
+    console.error('[Cost Check] Failed to check cost limit:', error.message)
+    next()
+  }
+}
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -408,7 +546,8 @@ Return ONLY the JSON object, no other text.`
 }
 
 // API Routes
-app.post('/api/analyze', async (req, res) => {
+// Apply security middleware: cost limit → burst limit → hourly limit → URL validation
+app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, validateUrl, async (req, res) => {
   try {
     const { url, refresh } = req.body
 
@@ -480,8 +619,7 @@ app.post('/api/analyze', async (req, res) => {
         status: 'error'
       })
       return res.status(500).json({
-        error: 'Failed to scrape product page',
-        details: scrapedData.error
+        error: sanitizeError('Failed to scrape product page')
       })
     }
 
@@ -584,8 +722,8 @@ app.post('/api/analyze', async (req, res) => {
     })
 
   } catch (error) {
-    console.error('[API Error]:', error)
-    res.status(500).json({ error: error.message || 'Analysis failed' })
+    console.error('[API Error]:', error) // Full error logged server-side
+    res.status(500).json({ error: sanitizeError(error) }) // Generic error sent to client
   }
 })
 
@@ -1214,7 +1352,8 @@ function generateFallbackAlternatives(fabricData, brand, productType = 'athletic
 }
 
 // Streaming version of /api/analyze using Server-Sent Events (SSE)
-app.post('/api/analyze-stream', async (req, res) => {
+// Apply security middleware: cost limit → burst limit → hourly limit → URL validation
+app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, validateUrl, async (req, res) => {
   try {
     const { url, refresh } = req.body
 
@@ -1236,9 +1375,14 @@ app.post('/api/analyze-stream', async (req, res) => {
     res.setHeader('Connection', 'keep-alive')
     res.flushHeaders()
 
+    // Check if user is admin
+    const isAdmin = req.cookies.admin_session === 'true'
+
     const sendEvent = (event, data) => {
+      // Enrich all events with admin status
+      const enrichedData = { ...data, isAdmin }
       res.write(`event: ${event}\n`)
-      res.write(`data: ${JSON.stringify(data)}\n\n`)
+      res.write(`data: ${JSON.stringify(enrichedData)}\n\n`)
     }
 
     console.log(`\n[Streaming Analysis] URL: ${url}${refresh ? ' (FORCE REFRESH)' : ''}`)
@@ -1293,7 +1437,7 @@ app.post('/api/analyze-stream', async (req, res) => {
     const firecrawlTime = Date.now() - firecrawlStart
 
     if (!scrapedData.success) {
-      sendEvent('error', { message: 'Failed to scrape product page', details: scrapedData.error })
+      sendEvent('error', { message: sanitizeError('Failed to scrape product page') })
       res.end()
       return
     }
@@ -1394,15 +1538,16 @@ app.post('/api/analyze-stream', async (req, res) => {
     res.end()
 
   } catch (error) {
-    console.error('[Streaming API Error]:', error)
+    console.error('[Streaming API Error]:', error) // Full error logged server-side
     res.write(`event: error\n`)
-    res.write(`data: ${JSON.stringify({ message: error.message || 'Analysis failed' })}\n\n`)
+    res.write(`data: ${JSON.stringify({ message: sanitizeError(error) })}\n\n`) // Generic error sent to client
     res.end()
   }
 })
 
 // API route to get product alternatives
-app.post('/api/alternatives', async (req, res) => {
+// Apply rate limiting (no URL validation needed - this endpoint receives fabric data, not URLs)
+app.post('/api/alternatives', burstLimiter, hourlyLimiter, async (req, res) => {
   try {
     const { fabrics, quality_tier, features, brand, productType } = req.body
 
@@ -1418,14 +1563,58 @@ app.post('/api/alternatives', async (req, res) => {
 
     res.json({ alternatives })
   } catch (error) {
-    console.error('[Alternatives API Error]:', error)
-    res.status(500).json({ error: 'Failed to generate alternatives' })
+    console.error('[Alternatives API Error]:', error) // Full error logged server-side
+    res.status(500).json({ error: sanitizeError(error) }) // Generic error sent to client
   }
 })
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// ============================================================================
+// ADMIN ACCESS ROUTES
+// ============================================================================
+
+/**
+ * Admin verification endpoint
+ * Usage: fabricfinder.fit/admin?key=YOUR_SECRET_KEY
+ * Sets httpOnly cookie that persists for 90 days
+ */
+app.get('/api/admin/verify', (req, res) => {
+  const { key } = req.query
+
+  if (!key || !isValidAdminKey(key)) {
+    return res.status(401).json({
+      isAdmin: false,
+      error: 'Invalid admin key'
+    })
+  }
+
+  // Set secure httpOnly cookie (secure in production)
+  res.cookie('admin_session', 'true', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days
+    sameSite: 'strict'
+  })
+
+  console.log('[ADMIN] Admin access granted')
+
+  res.json({
+    isAdmin: true,
+    message: 'Admin access granted. You now have unlimited scans and no ads.'
+  })
+})
+
+/**
+ * Check admin status endpoint
+ * Returns whether the current user is an admin
+ */
+app.get('/api/admin/status', (req, res) => {
+  const isAdmin = req.cookies.admin_session === 'true'
+  res.json({ isAdmin })
 })
 
 // Serve static files in production

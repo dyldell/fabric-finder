@@ -1,0 +1,139 @@
+.limit-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-6);
+  border: 1px solid;
+  gap: var(--space-4);
+}
+
+.limit-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 1;
+}
+
+.limit-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.limit-text strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.limit-text p {
+  font-size: 14px;
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* Warning state (2 scans or less) */
+.limit-warning {
+  background: linear-gradient(135deg, #fff3cd 0%, #fff8e1 100%);
+  border-color: #ffc107;
+  color: #856404;
+}
+
+.limit-warning .limit-icon {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Reached limit state (0 scans) */
+.limit-reached {
+  background: linear-gradient(135deg, #f8d7da 0%, #ffe5e7 100%);
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+.limit-reached .limit-icon {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Upgrade buttons */
+.upgrade-btn,
+.upgrade-btn-small {
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.upgrade-btn:hover:not(:disabled),
+.upgrade-btn-small:hover:not(:disabled) {
+  background: var(--color-accent-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.upgrade-btn:disabled,
+.upgrade-btn-small:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upgrade-btn {
+  padding: var(--space-4) var(--space-6);
+  font-size: 15px;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .limit-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--space-4);
+  }
+
+  .limit-content {
+    width: 100%;
+  }
+
+  .limit-text strong {
+    font-size: 15px;
+  }
+
+  .limit-text p {
+    font-size: 13px;
+  }
+
+  .upgrade-btn,
+  .upgrade-btn-small {
+    width: 100%;
+    text-align: center;
+  }
+}

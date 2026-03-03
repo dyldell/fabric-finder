@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import AdSlot from './AdSlot'
 import './Results.css'
 
-const Results = ({ data }) => {
+const Results = ({ data, isAdmin }) => {
   const [animatedFabrics, setAnimatedFabrics] = useState([])
 
   useEffect(() => {
@@ -69,7 +70,12 @@ const Results = ({ data }) => {
             )}
             <div className="product-details">
               {data.brand && <div className="product-brand">{data.brand}</div>}
-              <h2 className="product-name">{data.product_name}</h2>
+              <h2 className="product-name">
+                {data.product_name}
+                {isAdmin && (
+                  <span className="admin-badge">⚡ Admin Mode</span>
+                )}
+              </h2>
               {data.product_type && data.gender && (
                 <div className="product-category">
                   {data.gender}'s {data.product_type}
@@ -156,6 +162,9 @@ const Results = ({ data }) => {
           </div>
         )}
       </div>
+
+      {/* Ad Slot - Only shown to free users */}
+      <AdSlot isAdmin={isAdmin} />
 
       {/* Find It Cheaper Section */}
       {data.fabrics && data.fabrics.length > 0 && alternatives.length > 0 && (

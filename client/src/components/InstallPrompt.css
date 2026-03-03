@@ -1,0 +1,196 @@
+.install-prompt-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  padding: var(--space-4);
+  animation: slideUp 0.3s ease-out;
+  pointer-events: none;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.install-prompt-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  margin: 0 auto;
+  position: relative;
+  pointer-events: auto;
+  border: 2px solid var(--color-accent);
+}
+
+.install-prompt-close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.install-prompt-close:hover {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.install-prompt-icon {
+  font-size: 48px;
+  text-align: center;
+  margin-bottom: var(--space-3);
+}
+
+.install-prompt-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-align: center;
+  margin-bottom: var(--space-2);
+}
+
+.install-prompt-description {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  margin-bottom: var(--space-6);
+  line-height: 1.5;
+}
+
+.install-prompt-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.install-prompt-btn-primary,
+.install-prompt-btn-secondary {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 48px;
+}
+
+.install-prompt-btn-primary {
+  background: var(--color-accent);
+  color: white;
+}
+
+.install-prompt-btn-primary:hover {
+  background: var(--color-accent-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.install-prompt-btn-primary:active {
+  transform: translateY(0);
+}
+
+.install-prompt-btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.install-prompt-btn-secondary:hover {
+  background: var(--color-background);
+}
+
+.install-prompt-benefits {
+  display: flex;
+  justify-content: space-around;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.benefit-item {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/* iOS Instructions */
+.install-prompt-ios {
+  background: var(--color-surface);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-5);
+}
+
+.ios-instructions {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  text-align: center;
+}
+
+.ios-share-icon {
+  display: inline-block;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--color-accent);
+  margin: 0 4px;
+  transform: rotate(90deg);
+}
+
+.ios-instructions strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .install-prompt-overlay {
+    padding: var(--space-3);
+  }
+
+  .install-prompt-card {
+    padding: var(--space-5);
+  }
+
+  .install-prompt-title {
+    font-size: 20px;
+  }
+
+  .install-prompt-description {
+    font-size: 14px;
+  }
+
+  .benefit-item {
+    font-size: 12px;
+  }
+}
+
+/* Don't show when app is installed */
+@media (display-mode: standalone) {
+  .install-prompt-overlay {
+    display: none;
+  }
+}
