@@ -231,9 +231,9 @@ function App() {
         } />
 
         {/* Legal Pages */}
-        <Route path="/privacy" element={<><PrivacyPolicy /><Footer /></>} />
-        <Route path="/terms" element={<><TermsOfService /><Footer /></>} />
-        <Route path="/about" element={<><About /><Footer /></>} />
+        <Route path="/privacy" element={<><Navbar /><PrivacyPolicy /><Footer /></>} />
+        <Route path="/terms" element={<><Navbar /><TermsOfService /><Footer /></>} />
+        <Route path="/about" element={<><Navbar /><About /><Footer /></>} />
       </Routes>
     </div>
   )
