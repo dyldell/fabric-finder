@@ -1331,10 +1331,13 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     })
   }
 
+  // EXCLUSION KEYWORDS: Block dress/formal wear (athletic wear only)
+  const exclusions = '-dress -button -oxford -formal -casual -flannel'
+
   // NEW Query 3: Amazon-specific fabric percentage search (prioritize exact matches)
   const amazonFabricQuery = gender && typeWithInseam
-    ? `${fabricString} ${gender} ${typeWithInseam}`
-    : `${fabricString} ${typeWithInseam}`
+    ? `${fabricString} ${gender} ${typeWithInseam} performance ${exclusions}`
+    : `${fabricString} ${typeWithInseam} performance ${exclusions}`
 
   console.log(`[Search] Running searches: Amazon PAAPI + Amazon SerpAPI (3 queries) + Google Shopping (2 queries) - FABRIC OPTIMIZED`)
 
@@ -1346,9 +1349,9 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   const [amazonPaapiResults, amazonSerpFabric, amazonSerpExact, amazonSerpSecond, ...googleShoppingResults] = await Promise.all([
     searchAmazonProducts(fabricData, brand, productType),
     searchAmazonViaSerpApi(fabricData, brand, productType, amazonFabricQuery),
-    searchAmazonViaSerpApi(fabricData, brand, productType, fabricExactQuery?.query || `${gender} ${typeWithInseam} athletic`),
-    searchAmazonViaSerpApi(fabricData, brand, productType, secondQuery?.query || `budget ${typeWithInseam} athletic`),
-    ...queries.map(q => searchSerpApiProducts(fabricData, brand, productType, q.query))
+    searchAmazonViaSerpApi(fabricData, brand, productType, `${fabricExactQuery?.query || `${gender} ${typeWithInseam} athletic`} ${exclusions}`),
+    searchAmazonViaSerpApi(fabricData, brand, productType, `${secondQuery?.query || `budget ${typeWithInseam} athletic`} ${exclusions}`),
+    ...queries.map(q => searchSerpApiProducts(fabricData, brand, productType, `${q.query} ${exclusions}`))
   ])
 
   // Combine all Amazon results (PAAPI + SerpAPI x3)
@@ -1578,6 +1581,17 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   })
 
   console.log(`[Search] Sorted by source (Amazon first), then fabric match %`)
+
+  // Filter out dress/formal wear (buttons, oxford, formal shirts)
+  const dressShirtKeywords = ['dress shirt', 'button-up', 'button-down', 'oxford', 'formal shirt', 'flannel']
+  const beforeFilter = rankedProducts.length
+  rankedProducts = rankedProducts.filter(product => {
+    const titleLower = (product.title || '').toLowerCase()
+    return !dressShirtKeywords.some(keyword => titleLower.includes(keyword))
+  })
+  if (beforeFilter > rankedProducts.length) {
+    console.log(`[Filter] Removed ${beforeFilter - rankedProducts.length} dress/formal shirts`)
+  }
 
   // Filter out the original brand and brand-specific keywords
   if (brand) {
