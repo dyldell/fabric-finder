@@ -1,0 +1,15 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Blue gradient "FF" logo -->
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5DADE2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5B5FD9;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Left F -->
+  <path d="M 252 277 C 252 241 281 213 317 213 L 489 213 C 525 213 553 241 553 277 L 553 405 C 553 441 525 469 489 469 L 361 469 L 361 533 L 489 533 C 525 533 553 561 553 597 L 553 661 L 361 661 L 361 854 L 252 854 L 252 277 Z" fill="url(#logoGradient)"/>
+
+  <!-- Right F -->
+  <path d="M 626 277 C 626 241 655 213 691 213 L 863 213 C 899 213 927 241 927 277 L 927 405 C 927 441 899 469 863 469 L 735 469 L 735 533 L 863 533 C 899 533 927 561 927 597 L 927 661 L 735 661 L 735 854 L 626 854 L 626 277 Z" fill="url(#logoGradient)"/>
+</svg>
