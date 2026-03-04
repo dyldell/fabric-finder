@@ -1691,73 +1691,161 @@ async function searchProductAlternativesProgressive(fabricData, brand, productTy
 
   const typeWithInseam = type
 
-  // HARDCODED ODODOS DUPES (same as regular search function)
-  let hardcodedProduct = null
+  // HARDCODED ODODOS DUPES: 15 Vuori products mapped to exact ODODOS alternatives
+  // These are guaranteed 100% or 99% matches that always show first
+  let ododos = null
   if (brand?.toLowerCase() === 'vuori') {
+    const productTypeLower = type?.toLowerCase() || ''
     const genderLower = (fabricData.gender || '').toLowerCase()
 
-    // Men's Strato products
+    // DETECT PRODUCT TYPE AND INJECT CORRESPONDING ODODOS PRODUCT
+    // Men's 100% Exact Matches (Strato line - exact fabric)
     if (genderLower.includes('men') && !genderLower.includes('women')) {
-      if (productName.includes('strato') && productName.includes('long') && (typeWithInseam.includes('tee') || productName.includes('tee'))) {
-        hardcodedProduct = {
+      if (productName.includes('strato') && productName.includes('long') && (productTypeLower.includes('tee') || productName.includes('tee'))) {
+        // Long Sleeve Strato Tech Tee
+        ododos = {
           title: "ODODOS Men's Long Sleeve Performance T-Shirt - odSTRATUM Tech Tee",
           price: "$23.98",
           image: "https://m.media-amazon.com/images/I/71yP3tP3jsL._AC_SY500_.jpg",
           url: "https://www.amazon.com/dp/B0F484X2ZV",
-          features: ["96% Polyester, 4% Elastane"],
-          matchPercentage: 100,
-          source: "Amazon",
-          rating: "4.5",
-          reviews: "10,000+",
-          _hardcoded: true
+          features: ["96% Polyester, 4% Elastane"], matchPercentage: 100
+        }
+      } else if (productName.includes('strato') && productName.includes('hoodie')) {
+        // Strato Tech Hoodie
+        ododos = {
+          title: "ODODOS Men's Long Sleeve Hoodie - odSTRATUM Tech Performance Pullover",
+          price: "$26.98",
+          image: "https://m.media-amazon.com/images/I/71HCAJBlFlL._AC_SY606_.jpg",
+          url: "https://www.amazon.com/dp/B0FQJDRP6T",
+          features: ["96% Polyester, 4% Elastane"], matchPercentage: 100
+        }
+      } else if (productName.includes('strato') && productName.includes('long') && productName.includes('polo')) {
+        // Long Sleeve Strato Tech Polo
+        ododos = {
+          title: "ODODOS Men's Performance Long Sleeve Polo - odSTRATUM Tech Golf T-Shirts",
+          price: "$26.98",
+          image: "https://m.media-amazon.com/images/I/81wVahwe-5L._AC_SY500_.jpg",
+          url: "https://www.amazon.com/dp/B0FRFMZ11Z",
+          features: ["96% Polyester, 4% Elastane"], matchPercentage: 100
         }
       } else if (productName.includes('strato') && productName.includes('polo')) {
-        // Short or Long Sleeve Strato Polo
-        if (productName.includes('long')) {
-          hardcodedProduct = {
-            title: "ODODOS Men's Performance Long Sleeve Polo - odSTRATUM Tech Golf T-Shirts",
-            price: "$26.98",
-            image: "https://m.media-amazon.com/images/I/81wVahwe-5L._AC_SY500_.jpg",
-            url: "https://www.amazon.com/dp/B0FRFMZ11Z",
-            features: ["96% Polyester, 4% Elastane"],
-            matchPercentage: 100,
-            source: "Amazon",
-            rating: "4.5",
-            reviews: "10,000+",
-            _hardcoded: true
-          }
-        } else {
-          hardcodedProduct = {
-            title: "ODODOS Men's Performance Polo - odSTRATUM Tech Short Sleeve Golf T-Shirts",
-            price: "$25.18",
-            image: "https://m.media-amazon.com/images/I/71rEELBs7NL._AC_SY445_.jpg",
-            url: "https://www.amazon.com/dp/B0F487PZQV",
-            features: ["96% Polyester, 4% Elastane"],
-            matchPercentage: 100,
-            source: "Amazon",
-            rating: "4.5",
-            reviews: "10,000+",
-            _hardcoded: true
-          }
+        // Short Sleeve Strato Tech Polo
+        ododos = {
+          title: "ODODOS Men's Performance Polo - odSTRATUM Tech Short Sleeve Golf T-Shirts",
+          price: "$25.18",
+          image: "https://m.media-amazon.com/images/I/71rEELBs7NL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0F487PZQV",
+          features: ["96% Polyester, 4% Elastane"], matchPercentage: 100
         }
-      } else if (productName.includes('strato') && (typeWithInseam.includes('tee') || productName.includes('tee'))) {
-        hardcodedProduct = {
+      } else if (productName.includes('strato') && productName.includes('muscle')) {
+        // Strato Muscle Tee
+        ododos = {
+          title: "ODODOS Men's Performance Tank Top - Ultra Soft odSTRATUM Tech Sleeveless Shirts",
+          price: "$17.98",
+          image: "https://m.media-amazon.com/images/I/71Uq5jl4p1L._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0FK4RRR2J",
+          features: ["96% Polyester, 4% Elastane"], matchPercentage: 100
+        }
+      } else if (productName.includes('strato') && productName.includes('tank')) {
+        // Strato Tech Tank
+        ododos = {
+          title: "ODODOS Men's Performance Tank - odSTRATUM Tech Muscle Tee",
+          price: "$16.98",
+          image: "https://m.media-amazon.com/images/I/71GDCyT8GNL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0F385K44S",
+          features: ["96% Polyester, 4% Elastane"], matchPercentage: 100
+        }
+      } else if (productName.includes('strato') && (productTypeLower.includes('tee') || productName.includes('tee'))) {
+        // Short Sleeve Strato Tech Tee (default)
+        ododos = {
           title: "ODODOS Men's Performance T-Shirt - odSTRATUM Tech Tee",
           price: "$16.99",
           image: "https://m.media-amazon.com/images/I/71yP3tP3jsL._AC_SY500_.jpg",
           url: "https://www.amazon.com/ODODOS-Mens-Performance-T-Shirt-odSTRATUM/dp/B0FLQ22KQ9",
-          features: ["96% Polyester, 4% Elastane"],
-          matchPercentage: 100,
-          source: "Amazon",
-          rating: "4.5",
-          reviews: "10,000+",
-          _hardcoded: true
+          features: ["96% Polyester, 4% Elastane"], matchPercentage: 100
+        }
+      } else if (productName.includes('coronado') && productName.includes('zip')) {
+        // Coronado Full Zip Hoodie - 99%
+        ododos = {
+          title: "ODODOS Men's Full-Zip Hoodie - odSTRATUM Tech Ultra Soft Outfit",
+          price: "$35.98",
+          image: "https://m.media-amazon.com/images/I/71Rr8GHbRdL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0FWCDG4MB",
+          features: ["Polyester/Elastane blend"], matchPercentage: 99
+        }
+      } else if (productName.includes('ponto') && productName.includes('jogger')) {
+        // Ponto Performance Jogger - 99%
+        ododos = {
+          title: "ODODOS Men's Performance Joggers - Ultra Soft odSTRATUM Tech Sweatpants",
+          price: "$39.98",
+          image: "https://m.media-amazon.com/images/I/71OYCGNW3BL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0G24BX6MZ",
+          features: ["Polyester/Elastane blend"], matchPercentage: 99
+        }
+      } else if (productName.includes('ponto') && productName.includes('short')) {
+        // Ponto Short - 99%
+        ododos = {
+          title: "ODODOS Men's Performance Shorts 7\" – Ultra Soft odSTRATUM Tech Everyday Shorts",
+          price: "$32.00",
+          image: "https://m.media-amazon.com/images/I/81GLbeq0NrL._AC_SY500_.jpg",
+          url: "https://www.amazon.com/dp/B0G24QCWR1",
+          features: ["Polyester/Elastane blend"], matchPercentage: 99
+        }
+      }
+    }
+    // Women's Products
+    else if (genderLower.includes('women')) {
+      if (productName.includes('daydream') && productName.includes('crew')) {
+        // Women's Daydream Crew - 100%
+        ododos = {
+          title: "ODODOS Women's Long Sleeve Crewneck Tee - Ultra-Soft odSTRATUM Tech",
+          price: "$23.98",
+          image: "https://m.media-amazon.com/images/I/717qloPuYHL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0GHNQSZBX",
+          features: ["96% Polyester, 4% Elastane"], matchPercentage: 100
+        }
+      } else if (productName.includes('performance') && productName.includes('jogger')) {
+        // Women's Performance Jogger - 99%
+        ododos = {
+          title: "ODODOS Women's Performance Joggers - Ultra Soft odSTRATUM Tech Sweatpants",
+          price: "$26.98",
+          image: "https://m.media-amazon.com/images/I/71j56NzOcGL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0G24CRQYQ",
+          features: ["Polyester/Elastane blend"], matchPercentage: 99
+        }
+      } else if (productName.includes('halo') && (productName.includes('wideleg') || productName.includes('pant') || productName.includes('legging'))) {
+        // Women's Halo Essential Wideleg Pant/Legging - 99% (check BEFORE shorts - "pant-short/long" refers to inseam)
+        ododos = {
+          title: "ODODOS Women's Straight Leg Pants Ultra Soft odSTRATUM Tech",
+          price: "$26.98",
+          image: "https://m.media-amazon.com/images/I/71JUsR1qXWL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0FV8CDTQC",
+          features: ["Polyester/Elastane blend"], matchPercentage: 99
+        }
+      } else if (productName.includes('halo') && productName.includes('short') && !productName.includes('pant') && !productName.includes('legging')) {
+        // Women's Halo Performance Short - 99% (only if NOT "pant-short" or "legging-short")
+        ododos = {
+          title: "ODODOS Women's Performance Shorts Ultra Soft odSTRATUM Tech Mid Rise",
+          price: "$24.28",
+          image: "https://m.media-amazon.com/images/I/711fHs8WyEL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0F6TVXP88",
+          features: ["Polyester/Elastane blend"], matchPercentage: 99
+        }
+      } else if (productName.includes('halo') && productName.includes('hoodie')) {
+        // Women's Halo Performance Hoodie - 99%
+        ododos = {
+          title: "ODODOS Women's Full-Zip Hoodie - odSTRATUM Tech Ultra Soft Outfit",
+          price: "$39.98",
+          image: "https://m.media-amazon.com/images/I/81gKjysfHzL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0FNMM4ZZM",
+          features: ["Polyester/Elastane blend"], matchPercentage: 99
         }
       }
     }
 
-    if (hardcodedProduct) {
-      console.log(`[HARDCODED PROGRESSIVE] Injected ODODOS ${hardcodedProduct.matchPercentage}% match: ${hardcodedProduct.title.substring(0, 50)}`)
+    // Inject if matched
+    if (ododos) {
+      console.log(`[HARDCODED PROGRESSIVE] Injected ODODOS ${ododos.matchPercentage}% match: ${ododos.title.substring(0, 50)}`)
     }
   }
 
@@ -1777,8 +1865,17 @@ async function searchProductAlternativesProgressive(fabricData, brand, productTy
   const allAmazonResults = [...amazonPaapiResults, ...amazonSerpFabric, ...amazonSerpExact, ...amazonSerpSecond]
 
   // Inject hardcoded product at the beginning
-  if (hardcodedProduct) {
-    allAmazonResults.unshift(hardcodedProduct)
+  if (ododos) {
+    const fullProduct = {
+      ...ododos,
+      originalPrice: null,
+      source: "Amazon",
+      rating: "4.5",
+      reviews: "10,000+",
+      delivery: null,
+      _hardcoded: true
+    }
+    allAmazonResults.unshift(fullProduct)
   }
 
   // Send Amazon results immediately (don't wait for Google Shopping)
