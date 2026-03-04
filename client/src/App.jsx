@@ -144,6 +144,14 @@ function App() {
                 } else if (eventType === 'fabric') {
                   fabricData = data
                   setResults({ ...data, alternatives: [] })
+                } else if (eventType === 'alternatives_partial') {
+                  // Progressive loading: show first batch of results
+                  if (fabricData && data.alternatives) {
+                    setResults({ ...fabricData, alternatives: data.alternatives })
+                    if (import.meta.env.DEV) {
+                      console.log(`Progressive: ${data.stage} - ${data.alternatives.length} results`)
+                    }
+                  }
                 } else if (eventType === 'alternatives') {
                   alternatives = data.alternatives
                 } else if (eventType === 'complete') {

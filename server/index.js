@@ -1587,6 +1587,104 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   return rankedProducts.slice(0, 10)
 }
 
+// PROGRESSIVE VERSION: Send results in batches as they come in
+async function searchProductAlternativesProgressive(fabricData, brand, productType = 'athletic wear', onProgress) {
+  console.log('[Search Progressive] Starting batch search strategy')
+
+  const gender = fabricData.gender || ''
+  let type = fabricData.product_type || productType
+  const productName = (fabricData.product_name || '').toLowerCase()
+
+  if (gender === 'womens' && (type === 'pants' || type === 'pant')) {
+    if (!productName.includes('wideleg') && !productName.includes('straight') && !productName.includes('jogger')) {
+      type = 'leggings'
+    }
+  }
+
+  const fabricString = fabricData.fabrics
+    .map(f => `${f.percentage}% ${f.type.replace(/^Recycled\s+/i, '')}`)
+    .join(' ')
+
+  const typeWithInseam = type
+  const amazonFabricQuery = gender && typeWithInseam
+    ? `${fabricString} ${gender} ${typeWithInseam}`
+    : `${fabricString} ${typeWithInseam}`
+
+  // BATCH 1: Amazon searches only (fast, ~8-10s)
+  console.log('[Progressive] Starting Amazon batch...')
+  const [amazonPaapiResults, amazonSerpFabric, amazonSerpExact, amazonSerpSecond] = await Promise.all([
+    searchAmazonProducts(fabricData, brand, productType),
+    searchAmazonViaSerpApi(fabricData, brand, productType, amazonFabricQuery),
+    searchAmazonViaSerpApi(fabricData, brand, productType, `${gender} ${typeWithInseam} ${fabricString}`),
+    searchAmazonViaSerpApi(fabricData, brand, productType, `${gender} ${typeWithInseam} athletic`)
+  ])
+
+  const allAmazonResults = [...amazonPaapiResults, ...amazonSerpFabric, ...amazonSerpExact, ...amazonSerpSecond]
+
+  // Send Amazon results immediately (don't wait for Google Shopping)
+  if (allAmazonResults.length > 0 && onProgress) {
+    const amazonOnly = await scoreAndRankProducts(fabricData.fabrics, allAmazonResults, type)
+    const topAmazon = amazonOnly.slice(0, 5) // Send top 5 Amazon results
+    onProgress(topAmazon, 'amazon')
+  }
+
+  // BATCH 2: Google Shopping (slower, runs in parallel with user seeing Amazon results)
+  console.log('[Progressive] Starting Google Shopping batch...')
+  const googleShoppingResults = await Promise.all([
+    searchSerpApiProducts(fabricData, brand, productType, `${gender} ${typeWithInseam} ${fabricString}`),
+    searchSerpApiProducts(fabricData, brand, productType, `${gender} ${typeWithInseam} athletic`)
+  ])
+
+  const allGoogleShoppingResults = googleShoppingResults.flat()
+  const allResults = [...allAmazonResults, ...allGoogleShoppingResults]
+
+  // Deduplicate and rank final results (same as original function)
+  const seenUrls = new Set()
+  const seenTitles = new Map()
+  const deduplicatedResults = allResults.filter(product => {
+    if (seenUrls.has(product.url)) return false
+    const titleKey = `${product.source}:${product.title?.substring(0, 30)}`
+    if (seenTitles.has(titleKey)) return false
+    seenUrls.add(product.url)
+    seenTitles.set(titleKey, product)
+    return true
+  })
+
+  let allProducts = deduplicatedResults
+
+  if (allProducts.length === 0) {
+    return generateFallbackAlternatives(fabricData, brand, productType)
+  }
+
+  let rankedProducts = await scoreAndRankProducts(fabricData.fabrics, allProducts, type)
+  rankedProducts.sort((a, b) => b.matchPercentage - a.matchPercentage)
+
+  // Filter brand
+  if (brand) {
+    const brandKeywords = fabricData.keywords || []
+    rankedProducts = rankedProducts.filter(product => {
+      const title = product.title.toLowerCase()
+      if (title.includes(brand.toLowerCase())) return false
+      const genericTerms = ['strato', 'tech', 'performance', 'moisture', 'wicking', 'athletic', 'dry', 'fit']
+      for (const keyword of brandKeywords) {
+        const keywordLower = keyword.toLowerCase()
+        if (genericTerms.some(term => keywordLower.includes(term))) continue
+        if (keyword.length > 5 && keyword[0] === keyword[0].toUpperCase()) {
+          if (title.includes(keywordLower)) return false
+        }
+      }
+      return true
+    })
+  }
+
+  console.log(`[Progressive] Final ${rankedProducts.length} products`)
+  if (onProgress) {
+    onProgress(rankedProducts.slice(0, 10), 'final')
+  }
+
+  return rankedProducts.slice(0, 10)
+}
+
 // Helper: Extract numeric price from string
 function extractPrice(priceString) {
   if (!priceString || typeof priceString !== 'string') return 999999
@@ -2031,16 +2129,32 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
     }
 
     const searchStart = Date.now()
-    const alternatives = await searchProductAlternatives(
+
+    // PROGRESSIVE LOADING: Send alternatives in batches
+    sendEvent('status', { step: 'search_amazon', message: 'Searching Amazon...' })
+    const alternatives = await searchProductAlternativesProgressive(
       fabricData,
       brand,
-      fabricData.product_type || 'athletic wear'
+      fabricData.product_type || 'athletic wear',
+      (partialResults, stage) => {
+        // Send partial results as they come in
+        if (stage === 'amazon') {
+          console.log(`[Progressive] Sending ${partialResults.length} Amazon results`)
+          sendEvent('alternatives_partial', {
+            alternatives: partialResults,
+            stage: 'amazon',
+            message: `Found ${partialResults.length} Amazon matches...`
+          })
+        } else if (stage === 'final') {
+          console.log(`[Progressive] Sending final ${partialResults.length} results`)
+        }
+      }
     )
     const searchTime = Date.now() - searchStart
 
     await trackApiCall('serpapi', {
       scanUrl: url,
-      callCount: 4,
+      callCount: 6,
       responseTime: searchTime,
       status: 'success'
     })
@@ -2057,13 +2171,13 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
 
     printApiSummary({
       claudeCalls: 2,
-      serpapiCalls: 4,
+      serpapiCalls: 6,
       firecrawlCalls: 1,
-      totalCost: (1 * 0.015) + (2 * 0.0075) + (4 * 0.0036),
+      totalCost: (1 * 0.015) + (2 * 0.0075) + (6 * 0.0036),
       scanTime: totalTime
     })
 
-    // Send alternatives and complete
+    // Send final alternatives and complete
     sendEvent('alternatives', { alternatives })
     sendEvent('complete', { cached: false, scanTime: totalTime })
     clearTimeout(requestTimeout)
