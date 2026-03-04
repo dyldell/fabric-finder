@@ -1553,14 +1553,17 @@ For each product:
 - "100% Cotton" (1 fabric - SINGLE)
 - "Shell: 87% Nylon, 13% Elastane" (2 fabrics - BLEND)
 
-Return ONLY a JSON array:
+**CRITICAL: Return ONLY the JSON array, nothing else!** No explanations, no text before or after. Just the array!
+
+Format:
 [
-  {"index": 0, "matchPercentage": 100, "reason": "EXACT BLEND MATCH: 96% Polyester, 4% Elastane", "extractedFabric": "96% Polyester, 4% Elastane", "fabricCount": 2},
-  {"index": 1, "matchPercentage": 95, "reason": "Very close blend: 95% Polyester, 5% Spandex", "extractedFabric": "95% Polyester, 5% Spandex", "fabricCount": 2},
-  {"index": 2, "matchPercentage": 65, "reason": "PENALTY: Single fabric (100% Polyester) when original is a blend", "extractedFabric": "100% Polyester", "fabricCount": 1}
+  {"index": 0, "matchPercentage": 100, "reason": "EXACT BLEND: 96% Polyester, 4% Elastane", "extractedFabric": "96% Polyester, 4% Elastane", "fabricCount": 2},
+  {"index": 1, "matchPercentage": 95, "reason": "Close blend: 95% Polyester, 5% Spandex", "extractedFabric": "95% Polyester, 5% Spandex", "fabricCount": 2},
+  {"index": 2, "matchPercentage": 65, "reason": "PENALTY: 100% Polyester (single fabric)", "extractedFabric": "100% Polyester", "fabricCount": 1},
+  {"index": 3, "matchPercentage": 85, "reason": "No fabric data but has performance keywords"}
 ]
 
-CRITICAL: Blend count mismatch = automatic penalty! Products WITH extracted fabric data ALWAYS rank above products WITHOUT fabric data!`
+REMEMBER: Blend products ALWAYS beat single-fabric products when original is a blend!`
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -1572,9 +1575,20 @@ CRITICAL: Blend count mismatch = automatic penalty! Products WITH extracted fabr
     })
 
     let responseText = message.content[0].text
+
+    // Extract JSON array from response (handle cases where Claude adds explanation text)
     responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
 
-    const scores = JSON.parse(responseText)
+    // Find the JSON array (starts with [ and ends with ])
+    const arrayStart = responseText.indexOf('[')
+    const arrayEnd = responseText.lastIndexOf(']')
+
+    if (arrayStart === -1 || arrayEnd === -1) {
+      throw new Error(`No JSON array found in response: ${responseText.substring(0, 200)}`)
+    }
+
+    const jsonArray = responseText.substring(arrayStart, arrayEnd + 1)
+    const scores = JSON.parse(jsonArray)
 
     // Add match data to products and sort by match percentage
     const scoredProducts = products.map((product, idx) => {
