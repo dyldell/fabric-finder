@@ -22,11 +22,22 @@
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
   padding: var(--space-4);
   background: rgba(59, 130, 246, 0.05);
   border-radius: var(--radius-md);
   border: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.footer-disclaimer {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-6);
+  padding: var(--space-3);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
 }
 
 .footer-links {
@@ -60,6 +71,10 @@
 
   .footer-disclosure {
     font-size: 12px;
+  }
+
+  .footer-disclaimer {
+    font-size: 11px;
   }
 
   .footer-links {
