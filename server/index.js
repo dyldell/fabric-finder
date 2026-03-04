@@ -1531,10 +1531,21 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     fabricData.product_type || productType
   )
 
-  // Sort by match percentage ONLY (highest first)
-  rankedProducts.sort((a, b) => b.matchPercentage - a.matchPercentage)
+  // Sort by SOURCE first (Amazon prioritized), then by match percentage
+  rankedProducts.sort((a, b) => {
+    // Amazon always comes first
+    const aIsAmazon = a.source === 'Amazon' ? 1 : 0
+    const bIsAmazon = b.source === 'Amazon' ? 1 : 0
 
-  console.log(`[Search] Sorted by fabric match % only`)
+    if (aIsAmazon !== bIsAmazon) {
+      return bIsAmazon - aIsAmazon // Amazon first
+    }
+
+    // Within same source, sort by match percentage
+    return b.matchPercentage - a.matchPercentage
+  })
+
+  console.log(`[Search] Sorted by source (Amazon first), then fabric match %`)
 
   // Filter out the original brand and brand-specific keywords
   if (brand) {
@@ -1657,7 +1668,20 @@ async function searchProductAlternativesProgressive(fabricData, brand, productTy
   }
 
   let rankedProducts = await scoreAndRankProducts(fabricData.fabrics, allProducts, type)
-  rankedProducts.sort((a, b) => b.matchPercentage - a.matchPercentage)
+
+  // Sort by SOURCE first (Amazon prioritized), then by match percentage
+  rankedProducts.sort((a, b) => {
+    // Amazon always comes first
+    const aIsAmazon = a.source === 'Amazon' ? 1 : 0
+    const bIsAmazon = b.source === 'Amazon' ? 1 : 0
+
+    if (aIsAmazon !== bIsAmazon) {
+      return bIsAmazon - aIsAmazon // Amazon first
+    }
+
+    // Within same source, sort by match percentage
+    return b.matchPercentage - a.matchPercentage
+  })
 
   // Filter brand
   if (brand) {
