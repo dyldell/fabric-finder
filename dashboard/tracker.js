@@ -28,12 +28,13 @@ const API_COSTS = {
   claude: 0.0075,      // ~$0.015 per scan (2 calls)
   serpapi: 0.0036,     // ~$0.018 per scan (5 searches)
   firecrawl: 0.015,    // ~$0.015 per scan (1 scrape)
+  amazonPaapi: 0,      // Free for approved associates (requires 3 sales/180 days)
   supabase: 0          // Free tier
 }
 
 /**
  * Track an API call
- * @param {string} apiName - 'claude' | 'serpapi' | 'firecrawl' | 'supabase'
+ * @param {string} apiName - 'claude' | 'serpapi' | 'firecrawl' | 'amazonPaapi' | 'supabase'
  * @param {object} options
  * @param {string} options.scanUrl - The product URL being scanned
  * @param {number} options.callCount - How many times this API was called (default: 1)
@@ -90,6 +91,7 @@ export function printApiSummary(scanData) {
     claudeCalls = 0,
     serpapiCalls = 0,
     firecrawlCalls = 0,
+    amazonPaapiCalls = 0,
     totalCost = 0,
     scanTime = 0
   } = scanData
@@ -114,8 +116,13 @@ export function printApiSummary(scanData) {
       Cost: `$${(firecrawlCalls * API_COSTS.firecrawl).toFixed(4)}`
     },
     {
+      API: 'Amazon PAAPI',
+      Calls: amazonPaapiCalls,
+      Cost: amazonPaapiCalls > 0 ? 'FREE' : '$0.0000'
+    },
+    {
       API: 'TOTAL',
-      Calls: claudeCalls + serpapiCalls + firecrawlCalls,
+      Calls: claudeCalls + serpapiCalls + firecrawlCalls + amazonPaapiCalls,
       Cost: `$${totalCost.toFixed(4)}`
     }
   ])
