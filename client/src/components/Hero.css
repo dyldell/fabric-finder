@@ -1,7 +1,7 @@
 .hero {
   max-width: 720px;
-  margin: 0 auto var(--space-16);
-  padding: var(--space-16) var(--space-6);
+  margin: 0 auto var(--space-8);
+  padding: var(--space-12) var(--space-6);
   width: 100%;
   text-align: center;
   position: relative;
