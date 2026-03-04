@@ -678,11 +678,11 @@
       </div>
       <div class="hero-stats">
         <div class="hero-stat">
-          <span class="hero-stat-label">Total Scans Today</span>
+          <span class="hero-stat-label">Total Scans (24h)</span>
           <span class="hero-stat-value" id="total-scans-today">0</span>
         </div>
         <div class="hero-stat">
-          <span class="hero-stat-label">Estimated Cost Today</span>
+          <span class="hero-stat-label">Estimated Cost (24h)</span>
           <span class="hero-stat-value success" id="total-cost-today">$0.00</span>
         </div>
       </div>
@@ -770,13 +770,13 @@
     // Load dashboard data
     async function loadDashboardData() {
       try {
-        // Get today's stats
-        const today = new Date().toISOString().split('T')[0]
+        // Get last 24 hours of data (fixes timezone issues)
+        const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
         const { data: todayData, error: todayError } = await supabase
           .from('api_tracking')
           .select('*')
-          .gte('created_at', today)
+          .gte('created_at', last24Hours)
 
         if (todayError) throw todayError
 
@@ -884,11 +884,11 @@
           </div>
           <div class="api-metrics">
             <div class="api-metric">
-              <span class="api-metric-label">Calls Today</span>
+              <span class="api-metric-label">Calls (24h)</span>
               <span class="api-metric-value ${key}">${stat.calls.toLocaleString()}</span>
             </div>
             <div class="api-metric">
-              <span class="api-metric-label">Cost Today</span>
+              <span class="api-metric-label">Cost (24h)</span>
               <span class="api-metric-value ${key}">$${stat.cost.toFixed(4)}</span>
             </div>
             <div class="api-metric">
