@@ -1501,69 +1501,34 @@ async function scoreAndRankProducts(originalFabrics, products, productType) {
       features: p.features || []
     })))
 
-    const originalFabricCount = originalFabrics.length
-    const isBlend = originalFabricCount >= 2
-
     const prompt = `You are a fabric matching expert. The user is looking for products similar to one with this fabric composition:
-"${originalFabricString}" (${originalFabricCount} fabric${originalFabricCount > 1 ? 's' : ''})
+"${originalFabricString}"
 
 Product type: ${productType}
 
 Here are candidate products to rank:
 ${productsJson}
 
-CRITICAL RULES - FABRIC COMPOSITION FIRST OVER EVERYTHING:
+For each product, analyze the title and features to estimate the fabric composition match percentage.
 
-${isBlend ? `
-🚨 THE ORIGINAL IS A BLEND (${originalFabricCount} fabrics) - THIS CHANGES EVERYTHING! 🚨
+IMPORTANT SCORING GUIDELINES for Polyester/Elastane (Spandex) blends:
+- Products with "Performance", "Moisture Wicking", "Tech", "Athletic", "Dry Fit", "Quick Dry", "UPF" are HIGHLY LIKELY to be polyester/elastane blends
+- These keywords indicate 90-100% match for polyester/elastane searches
+- "odSTRATUM", "Cool Dri", "Dri-Power", brand names suggest high-performance polyester blends
 
-BLEND MATCHING RULES (NON-NEGOTIABLE):
-1. **BLEND COUNT MUST MATCH** - Products with ${originalFabricCount} fabrics rank MUCH higher than single-fabric products
-2. **100% single-fabric products are BAD matches** for blends (e.g., 100% Polyester has NO stretch when original has Elastane)
-3. Elastane/Spandex/Lycra adds stretch - if original has it, alternatives MUST have it too
-4. The blend ratio matters as much as the exact percentages
+Scoring rubric:
+- 95-100% = Has 3+ performance keywords (Performance, Moisture Wicking, Tech, UPF, Quick Dry, Athletic)
+- 90-94% = Has 2 performance keywords
+- 85-89% = Has 1 performance keyword or "workout/gym/running" in title
+- 80-84% = Generic athletic wear without specific performance features
+- 70-79% = Similar fabric type (e.g., polyester vs nylon)
+- <70% = Poor match
 
-STRICT Scoring for BLENDS:
-- 100% = EXACT same blend (e.g., both 96% Polyester, 4% Elastane)
-- 95-99% = Very close blend (within 3-5% on each component, e.g., 90-98% Polyester, 2-10% Elastane)
-- 90-94% = Similar blend type (e.g., 88% Nylon, 12% Elastane vs 85% Polyester, 15% Spandex)
-- 70-85% = Has ${originalFabricCount} fabrics but different types OR single fabric but with keywords
-- 60-69% = Single fabric (e.g., 100% Polyester) when original is a blend - MAJOR PENALTY
-- 85% max = NO fabric data + keywords (can't verify blend)
-
-CRITICAL: A 95% Polyester, 5% Elastane blend is a MUCH better match than 100% Polyester for a 96/4 blend!
-` : `
-THE ORIGINAL IS A SINGLE FABRIC (${originalFabricString})
-
-Scoring for SINGLE FABRIC:
-- 100% = Exact same single fabric (e.g., both 100% Cotton)
-- 95-99% = Same fabric type, slightly different percentage
-- 90-94% = Similar fabric (e.g., Polyester vs Nylon)
-- 85% max = NO fabric data + keywords
-`}
-
-For each product:
-1. **FIRST** search features for actual fabric composition (e.g., "88% Polyester, 12% Spandex", "100% Cotton", "Fabric: 90% Nylon 10% Elastane")
-2. **COUNT the number of fabrics** in the composition
-3. Calculate match based on blend similarity, NOT just percentages
-
-**Examples of fabric data in features:**
-- "88% Polyester, 12% Spandex" (2 fabrics - BLEND)
-- "Fabric: 90% Nylon 10% Elastane" (2 fabrics - BLEND)
-- "100% Cotton" (1 fabric - SINGLE)
-- "Shell: 87% Nylon, 13% Elastane" (2 fabrics - BLEND)
-
-**CRITICAL: Return ONLY the JSON array, nothing else!** No explanations, no text before or after. Just the array!
-
-Format:
+Return ONLY a JSON array with this structure:
 [
-  {"index": 0, "matchPercentage": 100, "reason": "EXACT BLEND: 96% Polyester, 4% Elastane", "extractedFabric": "96% Polyester, 4% Elastane", "fabricCount": 2},
-  {"index": 1, "matchPercentage": 95, "reason": "Close blend: 95% Polyester, 5% Spandex", "extractedFabric": "95% Polyester, 5% Spandex", "fabricCount": 2},
-  {"index": 2, "matchPercentage": 65, "reason": "PENALTY: 100% Polyester (single fabric)", "extractedFabric": "100% Polyester", "fabricCount": 1},
-  {"index": 3, "matchPercentage": 85, "reason": "No fabric data but has performance keywords"}
-]
-
-REMEMBER: Blend products ALWAYS beat single-fabric products when original is a blend!`
+  {"index": 0, "matchPercentage": 98, "reason": "Performance + Moisture Wicking + Tech + UPF indicates polyester/elastane blend"},
+  {"index": 1, "matchPercentage": 85, "reason": "Athletic tee, likely synthetic blend"}
+]`
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -1575,20 +1540,9 @@ REMEMBER: Blend products ALWAYS beat single-fabric products when original is a b
     })
 
     let responseText = message.content[0].text
-
-    // Extract JSON array from response (handle cases where Claude adds explanation text)
     responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
 
-    // Find the JSON array (starts with [ and ends with ])
-    const arrayStart = responseText.indexOf('[')
-    const arrayEnd = responseText.lastIndexOf(']')
-
-    if (arrayStart === -1 || arrayEnd === -1) {
-      throw new Error(`No JSON array found in response: ${responseText.substring(0, 200)}`)
-    }
-
-    const jsonArray = responseText.substring(arrayStart, arrayEnd + 1)
-    const scores = JSON.parse(jsonArray)
+    const scores = JSON.parse(responseText)
 
     // Add match data to products and sort by match percentage
     const scoredProducts = products.map((product, idx) => {
@@ -1596,30 +1550,19 @@ REMEMBER: Blend products ALWAYS beat single-fabric products when original is a b
       return {
         ...product,
         matchPercentage: score?.matchPercentage || 50,
-        matchReason: score?.reason || 'Unable to determine match',
-        extractedFabric: score?.extractedFabric || null,
-        fabricCount: score?.fabricCount || 0
+        matchReason: score?.reason || 'Unable to determine match'
       }
     })
 
-    // Sort by match percentage (highest first), then by price (lowest first) for ties
-    scoredProducts.sort((a, b) => {
-      if (b.matchPercentage !== a.matchPercentage) {
-        return b.matchPercentage - a.matchPercentage
-      }
-      // If match percentages are equal, prefer lower price
-      const priceA = parseFloat(a.price?.replace('$', '')) || 999
-      const priceB = parseFloat(b.price?.replace('$', '')) || 999
-      return priceA - priceB
-    })
+    // Sort by match percentage (highest first)
+    scoredProducts.sort((a, b) => b.matchPercentage - a.matchPercentage)
 
     console.log(`[Claude Matching] Scored and ranked ${scoredProducts.length} products`)
 
     // Log top 15 products for debugging
     console.log('\n[Top 15 Products After Scoring]:')
     scoredProducts.slice(0, 15).forEach((p, i) => {
-      const fabricInfo = p.extractedFabric ? ` | Fabric (${p.fabricCount}): ${p.extractedFabric}` : ' | No fabric data'
-      console.log(`${i + 1}. [${p.matchPercentage}%] ${p.title.substring(0, 50)}...${fabricInfo}`)
+      console.log(`${i + 1}. [${p.matchPercentage}%] ${p.title.substring(0, 80)}... (${p.source})`)
     })
     console.log('')
 
