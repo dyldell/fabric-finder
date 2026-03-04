@@ -48,15 +48,18 @@ export default function PrivacyPolicy() {
         <section>
           <h2>4. Third-Party Services</h2>
           <p>
-            Fabric Finder uses the following third-party services:
+            Fabric Finder uses third-party services to provide our features:
           </p>
           <ul>
-            <li><strong>Google AdSense:</strong> To display advertisements on our site</li>
+            <li><strong>AI Technology:</strong> To analyze fabric composition and product details</li>
+            <li><strong>Search Services:</strong> To find alternative products across the web</li>
             <li><strong>Amazon Associates:</strong> To provide product recommendations and earn affiliate commissions</li>
-            <li><strong>Firecrawl:</strong> To scrape product information from retailer websites</li>
-            <li><strong>Claude API (Anthropic):</strong> To analyze fabric composition using AI</li>
-            <li><strong>Supabase:</strong> To cache analysis results and improve performance</li>
+            <li><strong>Google AdSense:</strong> To display advertisements on our site</li>
+            <li><strong>Data Storage:</strong> To cache analysis results and improve performance</li>
           </ul>
+          <p className="third-party-note">
+            These services may collect and process data according to their own privacy policies.
+          </p>
         </section>
 
         <section>
