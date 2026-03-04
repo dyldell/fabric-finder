@@ -76,6 +76,10 @@ const AnalysisForm = ({ onAnalyze, loading }) => {
             Analyze Fabric
           </button>
         )}
+
+        <p className="form-hint">
+          Works with Lululemon · Alo Yoga · Patagonia · Vuori · and thousands more
+        </p>
       </form>
     </div>
   )
