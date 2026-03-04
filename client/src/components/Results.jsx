@@ -164,7 +164,7 @@ const Results = ({ data, isAdmin }) => {
       </div>
 
       {/* Ad Slot - Only shown to free users */}
-      <AdSlot isAdmin={isAdmin} />
+      {/* <AdSlot isAdmin={isAdmin} /> */}
 
       {/* Find It Cheaper Section */}
       {data.fabrics && data.fabrics.length > 0 && alternatives.length > 0 && (
