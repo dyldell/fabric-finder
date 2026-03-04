@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
+import HowItWorks from './components/HowItWorks'
 import AnalysisForm from './components/AnalysisForm'
 import Results from './components/Results'
 import Footer from './components/Footer'
@@ -186,6 +187,7 @@ function App() {
           <>
             <Navbar />
             <Hero />
+            <HowItWorks />
             <main className="container">
               <ScanLimitBanner isAdmin={isAdmin} />
               <AnalysisForm
