@@ -1205,10 +1205,14 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
   const gender = fabricData.gender || ''
   let type = fabricData.product_type || productType
   const inseam = fabricData.inseam || '' // Extract inseam for men's shorts
+  const productName = (fabricData.product_name || '').toLowerCase()
 
-  // Women's "pants" in athletic context = leggings
+  // Women's "pants" in athletic context = leggings (EXCEPT wideleg/straight leg pants)
   if (gender === 'womens' && (type === 'pants' || type === 'pant')) {
-    type = 'leggings'
+    // Keep as "pant" if it's wideleg, straight leg, or jogger
+    if (!productName.includes('wideleg') && !productName.includes('straight') && !productName.includes('jogger')) {
+      type = 'leggings'
+    }
   }
 
   // For men's shorts, add inseam to type if available
@@ -1442,22 +1446,22 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
           url: "https://www.amazon.com/dp/B0G24CRQYQ",
           features: ["Polyester/Elastane blend"], matchPercentage: 99
         }
-      } else if (productName.includes('halo') && productName.includes('short')) {
-        // Women's Halo Performance Short - 99%
-        ododos = {
-          title: "ODODOS Women's Performance Shorts Ultra Soft odSTRATUM Tech Mid Rise",
-          price: "$24.28",
-          image: "https://m.media-amazon.com/images/I/711fHs8WyEL._AC_SY445_.jpg",
-          url: "https://www.amazon.com/dp/B0F6TVXP88",
-          features: ["Polyester/Elastane blend"], matchPercentage: 99
-        }
-      } else if (productName.includes('halo') && (productName.includes('wideleg') || productName.includes('pant'))) {
-        // Women's Halo Essential Wideleg Pant - 99%
+      } else if (productName.includes('halo') && (productName.includes('wideleg') || productName.includes('pant') || productName.includes('legging'))) {
+        // Women's Halo Essential Wideleg Pant/Legging - 99% (check BEFORE shorts - "pant-short/long" refers to inseam)
         ododos = {
           title: "ODODOS Women's Straight Leg Pants Ultra Soft odSTRATUM Tech",
           price: "$26.98",
           image: "https://m.media-amazon.com/images/I/71JUsR1qXWL._AC_SY445_.jpg",
           url: "https://www.amazon.com/dp/B0FV8CDTQC",
+          features: ["Polyester/Elastane blend"], matchPercentage: 99
+        }
+      } else if (productName.includes('halo') && productName.includes('short') && !productName.includes('pant') && !productName.includes('legging')) {
+        // Women's Halo Performance Short - 99% (only if NOT "pant-short" or "legging-short")
+        ododos = {
+          title: "ODODOS Women's Performance Shorts Ultra Soft odSTRATUM Tech Mid Rise",
+          price: "$24.28",
+          image: "https://m.media-amazon.com/images/I/711fHs8WyEL._AC_SY445_.jpg",
+          url: "https://www.amazon.com/dp/B0F6TVXP88",
           features: ["Polyester/Elastane blend"], matchPercentage: 99
         }
       } else if (productName.includes('halo') && productName.includes('hoodie')) {
@@ -1882,17 +1886,27 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
 
       // Search for alternatives
       sendEvent('status', { step: 'search', message: 'Finding cheaper alternatives...' })
+
+      // FIX: Override product_type if URL contains wideleg/straight leg pant keywords
+      let correctedProductType = cachedData.product_type
+      const urlLower = url.toLowerCase()
+      if (urlLower.includes('wideleg') || (urlLower.includes('pant') && !urlLower.includes('legging'))) {
+        correctedProductType = 'pant'
+        console.log('[Product Type Override] URL contains wideleg/pant - correcting from "leggings" to "pant"')
+      }
+
       const alternatives = await searchProductAlternatives(
         {
           fabrics: cachedData.fabrics,
           quality_tier: cachedData.quality_tier,
           features: cachedData.features,
-          product_type: cachedData.product_type,
+          product_type: correctedProductType,
           gender: cachedData.gender,
-          keywords: cachedData.keywords
+          keywords: cachedData.keywords,
+          product_name: cachedData.product_name
         },
         cachedData.brand,
-        cachedData.product_type || 'athletic wear'
+        correctedProductType || 'athletic wear'
       )
 
       sendEvent('alternatives', { alternatives })
@@ -1972,6 +1986,14 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
     // Step 5: Search for alternatives
     sendEvent('status', { step: 'search', message: 'Finding cheaper alternatives...' })
     const brand = extractBrand(url)
+
+    // FIX: Override product_type if URL contains wideleg/straight leg pant keywords
+    const urlLower = url.toLowerCase()
+    if (urlLower.includes('wideleg') || (urlLower.includes('pant') && !urlLower.includes('legging'))) {
+      fabricData.product_type = 'pant'
+      console.log('[Product Type Override] URL contains wideleg/pant - correcting to "pant"')
+    }
+
     const searchStart = Date.now()
     const alternatives = await searchProductAlternatives(
       fabricData,
