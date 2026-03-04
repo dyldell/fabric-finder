@@ -1217,10 +1217,17 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
 
   // CRITICAL: Preserve important product descriptors (puffer, insulated, down, etc.)
   // These are essential for accurate search results
+  // Order matters - more specific descriptors first to avoid generic matches
   const importantDescriptors = [
-    'puffer', 'insulated', 'down', 'quilted', 'packable',
-    'fleece', 'thermal', 'windbreaker', 'rain', 'waterproof',
-    'softshell', 'hardshell', 'vest', 'hooded', 'zip'
+    'puffer', 'puff',  // Puffer jackets (very specific)
+    'down',            // Down jackets/vests (specific)
+    'fleece',          // Fleece (specific material)
+    'quilted',         // Quilted jackets (specific style)
+    'windbreaker', 'rain', 'waterproof',  // Weather-specific
+    'softshell', 'hardshell',  // Technical jackets
+    'thermal',         // Thermal layers
+    'insulated',       // Generic insulation (catch-all)
+    'packable', 'vest', 'hooded', 'zip'
   ]
 
   let productDescriptor = ''
@@ -1635,10 +1642,17 @@ async function searchProductAlternativesProgressive(fabricData, brand, productTy
   }
 
   // CRITICAL: Preserve important product descriptors (same as regular search)
+  // Order matters - more specific descriptors first
   const importantDescriptors = [
-    'puffer', 'insulated', 'down', 'quilted', 'packable',
-    'fleece', 'thermal', 'windbreaker', 'rain', 'waterproof',
-    'softshell', 'hardshell', 'vest', 'hooded', 'zip'
+    'puffer', 'puff',  // Puffer jackets (very specific)
+    'down',            // Down jackets/vests (specific)
+    'fleece',          // Fleece (specific material)
+    'quilted',         // Quilted jackets (specific style)
+    'windbreaker', 'rain', 'waterproof',  // Weather-specific
+    'softshell', 'hardshell',  // Technical jackets
+    'thermal',         // Thermal layers
+    'insulated',       // Generic insulation (catch-all)
+    'packable', 'vest', 'hooded', 'zip'
   ]
 
   let productDescriptor = ''
