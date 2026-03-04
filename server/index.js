@@ -35,6 +35,9 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// Trust proxy (required for Render, Heroku, etc. to get real client IPs)
+app.set('trust proxy', true)
+
 // ============================================================================
 // SECURITY MIDDLEWARE
 // ============================================================================
