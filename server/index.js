@@ -2446,10 +2446,11 @@ console.log('[Server] Dashboard route registered at /dashboard')
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static('../client/dist'))
+  const clientDistPath = path.join(__dirname, '../client/dist')
+  app.use(express.static(clientDistPath))
 
   app.get('*', (req, res) => {
-    res.sendFile(path.resolve('../client/dist/index.html'))
+    res.sendFile(path.join(clientDistPath, 'index.html'))
   })
 }
 
