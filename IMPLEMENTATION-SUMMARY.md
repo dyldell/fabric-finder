@@ -16,7 +16,7 @@ npm run dev
 
 ### 2. Test Admin Access (YOU)
 
-Visit: http://localhost:5173/admin?key=fabricfinder-admin-2026-secret-change-me
+Visit: http://localhost:5173?key=fabricfinder-admin-2026-secret-change-me
 
 **What you should see:**
 - ⚡ "Admin Mode" badge on scan results
@@ -29,9 +29,8 @@ Visit: http://localhost:5173/admin?key=fabricfinder-admin-2026-secret-change-me
 Open incognito window → Visit: http://localhost:5173
 
 **What you should see:**
-- First 3 scans: No warnings
-- Scans 4-5: "⏳ X scans remaining" warning
-- After 5 scans: Error message blocking further scans
+- First 3 scans: No warnings (limit is 3/month)
+- After 3 scans: Error message blocking further scans
 - Ad placeholder (will show real ads after AdSense setup)
 - Footer with affiliate disclosure
 
@@ -42,13 +41,13 @@ Open incognito window → Visit: http://localhost:5173
 Send this URL to your friends/girlfriend:
 
 ```
-http://localhost:5173/admin?key=fabricfinder-admin-2026-secret-change-me
+http://localhost:5173?key=fabricfinder-admin-2026-secret-change-me
 ```
 
 When deployed to production:
 
 ```
-https://fabricfinder.fit/admin?key=fabricfinder-admin-2026-secret-change-me
+https://fabricfinder.fit?key=fabricfinder-admin-2026-secret-change-me
 ```
 
 **⚠️ IMPORTANT:** Before deploying, change `ADMIN_SECRET_KEY` in `.env` to something more secure!

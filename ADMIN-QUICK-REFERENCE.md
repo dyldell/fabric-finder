@@ -4,12 +4,12 @@
 
 ### Local Development
 ```
-http://localhost:5173/admin?key=fabricfinder-admin-2026-secret-change-me
+http://localhost:5173?key=fabricfinder-admin-2026-secret-change-me
 ```
 
 ### Production (After Deploy)
 ```
-https://fabricfinder.fit/admin?key=fabricfinder-admin-2026-secret-change-me
+https://fabricfinder.fit?key=fabricfinder-admin-2026-secret-change-me
 ```
 
 **⚠️ CHANGE THIS KEY BEFORE DEPLOYING!**
@@ -23,7 +23,7 @@ https://fabricfinder.fit/admin?key=fabricfinder-admin-2026-secret-change-me
 > Hey! I built Fabric Finder - it analyzes clothing fabric and finds cheaper alternatives.
 >
 > You have admin access (unlimited scans, no ads):
-> http://localhost:5173/admin?key=fabricfinder-admin-2026-secret-change-me
+> http://localhost:5173?key=fabricfinder-admin-2026-secret-change-me
 >
 > Just click the link once and it'll remember you for 90 days!
 
@@ -33,7 +33,7 @@ https://fabricfinder.fit/admin?key=fabricfinder-admin-2026-secret-change-me
 
 When logged in as admin:
 - ⚡ Purple "Admin Mode" badge on results
-- ♾️ Unlimited scans (no 5/month limit)
+- ♾️ Unlimited scans (no 3/month limit)
 - 🚫 No ads shown
 - ⏰ 90-day persistent session
 
@@ -62,10 +62,12 @@ document.cookie = "admin_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/
 ```
 
 ### Reset Scan Counter (Testing)
-```javascript
-// In browser console:
-localStorage.removeItem('fabricfinder_scans')
-localStorage.removeItem('fabricfinder_month')
+Scan counts are now server-side (Supabase). To reset:
+1. Go to Supabase Dashboard → Table Editor → `user_scans`
+2. Find your user_id and delete the row
+3. Or in SQL Editor:
+```sql
+DELETE FROM user_scans WHERE user_id = 'your-user-id';
 ```
 
 ---

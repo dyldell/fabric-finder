@@ -1923,8 +1923,11 @@ app.get('/api/admin/status', (req, res) => {
  * Access: /dashboard (requires admin authentication)
  */
 app.get('/dashboard', (req, res) => {
+  console.log('[Dashboard] Route accessed')
+
   // Check if user is admin
   const isAdmin = req.cookies.admin_session === 'true'
+  console.log('[Dashboard] Admin status:', isAdmin)
 
   if (!isAdmin) {
     return res.status(403).send(`
@@ -1935,30 +1938,41 @@ app.get('/dashboard', (req, res) => {
         <div style="text-align: center;">
           <h1>🔒 Access Denied</h1>
           <p>This dashboard requires admin authentication.</p>
-          <a href="/?key=YOUR_ADMIN_KEY" style="color: #00F5FF;">Login as Admin</a>
+          <a href="http://localhost:5173?key=YOUR_ADMIN_KEY" style="color: #00F5FF;">Login as Admin</a>
         </div>
       </body>
       </html>
     `)
   }
 
-  // Read dashboard HTML and inject environment variables
-  const dashboardPath = path.join(__dirname, '../dashboard/index.html')
-  let html = fs.readFileSync(dashboardPath, 'utf8')
+  try {
+    // Read dashboard HTML and inject environment variables
+    const dashboardPath = path.join(__dirname, '../dashboard/index.html')
+    console.log('[Dashboard] Reading from:', dashboardPath)
 
-  // Replace hardcoded credentials with environment variables
-  html = html.replace(
-    /const SUPABASE_URL = '[^']*'/,
-    `const SUPABASE_URL = '${process.env.SUPABASE_URL}'`
-  )
-  html = html.replace(
-    /const SUPABASE_ANON_KEY = '[^']*'/,
-    `const SUPABASE_ANON_KEY = '${process.env.SUPABASE_ANON_KEY}'`
-  )
+    let html = fs.readFileSync(dashboardPath, 'utf8')
 
-  res.setHeader('Content-Type', 'text/html')
-  res.send(html)
+    // Replace hardcoded credentials with environment variables
+    html = html.replace(
+      /const SUPABASE_URL = '[^']*'/,
+      `const SUPABASE_URL = '${process.env.SUPABASE_URL}'`
+    )
+    html = html.replace(
+      /const SUPABASE_ANON_KEY = '[^']*'/,
+      `const SUPABASE_ANON_KEY = '${process.env.SUPABASE_ANON_KEY}'`
+    )
+
+    console.log('[Dashboard] Successfully injected environment variables')
+
+    res.setHeader('Content-Type', 'text/html')
+    res.send(html)
+  } catch (error) {
+    console.error('[Dashboard] Error:', error)
+    res.status(500).send('Error loading dashboard')
+  }
 })
+
+console.log('[Server] Dashboard route registered at /dashboard')
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

@@ -3,7 +3,7 @@
 ## What This App Does
 Users paste a clothing product URL → the app scrapes the product page → Claude API extracts the fabric composition (e.g. "87% Nylon, 13% Spandex") → the app finds similar quality items at lower prices → monetizes via Amazon affiliate links.
 
-Live at: fabricfinder.fit (currently on Replit — rebuilding locally with new stack)
+Live at: fabricfinder.fit (deployed on Render)
 
 ## Owner
 Dylan Dell (dyldell) — beginner developer, learning as he goes. Keep explanations clear and avoid unnecessary complexity.
@@ -66,10 +66,13 @@ fabricfinder/
 ## Environment Variables Needed
 ```
 ANTHROPIC_API_KEY=
+FIRECRAWL_API_KEY=
+SERP_API_KEY=
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
-FIRECRAWL_API_KEY=
+SUPABASE_SERVICE_KEY=
 AMAZON_ASSOCIATE_TAG=
+ADMIN_SECRET_KEY=
 ```
 
 ## Monetization Plan
