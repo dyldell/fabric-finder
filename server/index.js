@@ -1690,6 +1690,77 @@ async function searchProductAlternativesProgressive(fabricData, brand, productTy
     .join(' ')
 
   const typeWithInseam = type
+
+  // HARDCODED ODODOS DUPES (same as regular search function)
+  let hardcodedProduct = null
+  if (brand?.toLowerCase() === 'vuori') {
+    const genderLower = (fabricData.gender || '').toLowerCase()
+
+    // Men's Strato products
+    if (genderLower.includes('men') && !genderLower.includes('women')) {
+      if (productName.includes('strato') && productName.includes('long') && (typeWithInseam.includes('tee') || productName.includes('tee'))) {
+        hardcodedProduct = {
+          title: "ODODOS Men's Long Sleeve Performance T-Shirt - odSTRATUM Tech Tee",
+          price: "$23.98",
+          image: "https://m.media-amazon.com/images/I/71yP3tP3jsL._AC_SY500_.jpg",
+          url: "https://www.amazon.com/dp/B0F484X2ZV",
+          features: ["96% Polyester, 4% Elastane"],
+          matchPercentage: 100,
+          source: "Amazon",
+          rating: "4.5",
+          reviews: "10,000+",
+          _hardcoded: true
+        }
+      } else if (productName.includes('strato') && productName.includes('polo')) {
+        // Short or Long Sleeve Strato Polo
+        if (productName.includes('long')) {
+          hardcodedProduct = {
+            title: "ODODOS Men's Performance Long Sleeve Polo - odSTRATUM Tech Golf T-Shirts",
+            price: "$26.98",
+            image: "https://m.media-amazon.com/images/I/81wVahwe-5L._AC_SY500_.jpg",
+            url: "https://www.amazon.com/dp/B0FRFMZ11Z",
+            features: ["96% Polyester, 4% Elastane"],
+            matchPercentage: 100,
+            source: "Amazon",
+            rating: "4.5",
+            reviews: "10,000+",
+            _hardcoded: true
+          }
+        } else {
+          hardcodedProduct = {
+            title: "ODODOS Men's Performance Polo - odSTRATUM Tech Short Sleeve Golf T-Shirts",
+            price: "$25.18",
+            image: "https://m.media-amazon.com/images/I/71rEELBs7NL._AC_SY445_.jpg",
+            url: "https://www.amazon.com/dp/B0F487PZQV",
+            features: ["96% Polyester, 4% Elastane"],
+            matchPercentage: 100,
+            source: "Amazon",
+            rating: "4.5",
+            reviews: "10,000+",
+            _hardcoded: true
+          }
+        }
+      } else if (productName.includes('strato') && (typeWithInseam.includes('tee') || productName.includes('tee'))) {
+        hardcodedProduct = {
+          title: "ODODOS Men's Performance T-Shirt - odSTRATUM Tech Tee",
+          price: "$16.99",
+          image: "https://m.media-amazon.com/images/I/71yP3tP3jsL._AC_SY500_.jpg",
+          url: "https://www.amazon.com/ODODOS-Mens-Performance-T-Shirt-odSTRATUM/dp/B0FLQ22KQ9",
+          features: ["96% Polyester, 4% Elastane"],
+          matchPercentage: 100,
+          source: "Amazon",
+          rating: "4.5",
+          reviews: "10,000+",
+          _hardcoded: true
+        }
+      }
+    }
+
+    if (hardcodedProduct) {
+      console.log(`[HARDCODED PROGRESSIVE] Injected ODODOS ${hardcodedProduct.matchPercentage}% match: ${hardcodedProduct.title.substring(0, 50)}`)
+    }
+  }
+
   const amazonFabricQuery = gender && typeWithInseam
     ? `${fabricString} ${gender} ${typeWithInseam}`
     : `${fabricString} ${typeWithInseam}`
@@ -1704,6 +1775,11 @@ async function searchProductAlternativesProgressive(fabricData, brand, productTy
   ])
 
   const allAmazonResults = [...amazonPaapiResults, ...amazonSerpFabric, ...amazonSerpExact, ...amazonSerpSecond]
+
+  // Inject hardcoded product at the beginning
+  if (hardcodedProduct) {
+    allAmazonResults.unshift(hardcodedProduct)
+  }
 
   // Send Amazon results immediately (don't wait for Google Shopping)
   if (allAmazonResults.length > 0 && onProgress) {
