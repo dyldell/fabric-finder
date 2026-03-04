@@ -1325,7 +1325,7 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
       title: "ODODOS Men's Performance T-Shirt - odSTRATUM Tech Tee, Ultra Soft Moisture Wicking UPF 50+",
       price: "$16.99",
       originalPrice: null,
-      image: "https://m.media-amazon.com/images/I/71sL0qZN8PL._AC_UX679_.jpg",
+      image: "https://m.media-amazon.com/images/I/71yP3tP3jsL._AC_SY500_.jpg",
       url: "https://www.amazon.com/ODODOS-Mens-Performance-T-Shirt-odSTRATUM/dp/B0FLQ22KQ9",
       source: "Amazon",
       rating: "4.5",
