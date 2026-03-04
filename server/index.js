@@ -1299,22 +1299,28 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     })
   }
 
-  console.log(`[Search] Running searches: Amazon PAAPI + Amazon SerpAPI (2 queries) + Google Shopping (2 queries) - OPTIMIZED`)
+  // NEW Query 3: Amazon-specific fabric percentage search (prioritize exact matches)
+  const amazonFabricQuery = gender && typeWithInseam
+    ? `${fabricString} ${gender} ${typeWithInseam}`
+    : `${fabricString} ${typeWithInseam}`
 
-  // Run queries in parallel: Amazon PAAPI + Amazon SerpAPI (2 queries) + Google Shopping SerpAPI (2 queries)
-  // REDUCED: Google Shopping from 3 to 2 queries (saves $0.0036/scan)
+  console.log(`[Search] Running searches: Amazon PAAPI + Amazon SerpAPI (3 queries) + Google Shopping (2 queries) - FABRIC OPTIMIZED`)
+
+  // Run queries in parallel: Amazon PAAPI + Amazon SerpAPI (3 queries) + Google Shopping SerpAPI (2 queries)
+  // NEW: Added third Amazon query specifically for fabric percentages
   const fabricExactQuery = queries.find(q => q.name === 'fabric-exact')
   const secondQuery = queries.find(q => q.name === 'keyword') || queries.find(q => q.name === 'budget')
 
-  const [amazonPaapiResults, amazonSerpExact, amazonSerpSecond, ...googleShoppingResults] = await Promise.all([
+  const [amazonPaapiResults, amazonSerpFabric, amazonSerpExact, amazonSerpSecond, ...googleShoppingResults] = await Promise.all([
     searchAmazonProducts(fabricData, brand, productType),
+    searchAmazonViaSerpApi(fabricData, brand, productType, amazonFabricQuery),
     searchAmazonViaSerpApi(fabricData, brand, productType, fabricExactQuery?.query || `${gender} ${typeWithInseam} athletic`),
     searchAmazonViaSerpApi(fabricData, brand, productType, secondQuery?.query || `budget ${typeWithInseam} athletic`),
     ...queries.map(q => searchSerpApiProducts(fabricData, brand, productType, q.query))
   ])
 
-  // Combine all Amazon results (PAAPI + SerpAPI)
-  const allAmazonResults = [...amazonPaapiResults, ...amazonSerpExact, ...amazonSerpSecond]
+  // Combine all Amazon results (PAAPI + SerpAPI x3)
+  const allAmazonResults = [...amazonPaapiResults, ...amazonSerpFabric, ...amazonSerpExact, ...amazonSerpSecond]
 
   // Flatten Google Shopping results
   const allGoogleShoppingResults = googleShoppingResults.flat()
@@ -1695,23 +1701,31 @@ ${productsJson}
 
 For each product, analyze the title and features to estimate the fabric composition match percentage.
 
-IMPORTANT SCORING GUIDELINES for Polyester/Elastane (Spandex) blends:
-- Products with "Performance", "Moisture Wicking", "Tech", "Athletic", "Dry Fit", "Quick Dry", "UPF" are HIGHLY LIKELY to be polyester/elastane blends
-- These keywords indicate 90-100% match for polyester/elastane searches
-- "odSTRATUM", "Cool Dri", "Dri-Power", brand names suggest high-performance polyester blends
+CRITICAL FABRIC MATCHING RULES:
+1. **Exact fabric percentages in title/features = 95-100% match** (e.g., "75% Polyamide 25% Elastane")
+2. **Wrong base fabric = MAX 40% match** (e.g., "100% Polyester" when searching for Polyamide/Elastane blend)
+3. **Nylon = Polyamide** (same fiber, different names)
+4. **Elastane = Spandex = Lycra** (same fiber, different brands)
+
+Fabric hierarchy (for ${originalFabricString}):
+- BEST: Mentions exact percentages matching target (95-100%)
+- GOOD: Mentions correct base fabrics without percentages (85-94%)
+- OKAY: Performance keywords suggesting similar blend (75-84%)
+- POOR: Wrong base fabric or 100% single material when blend expected (20-40%)
 
 Scoring rubric:
-- 95-100% = Has 3+ performance keywords (Performance, Moisture Wicking, Tech, UPF, Quick Dry, Athletic)
-- 90-94% = Has 2 performance keywords
-- 85-89% = Has 1 performance keyword or "workout/gym/running" in title
-- 80-84% = Generic athletic wear without specific performance features
-- 70-79% = Similar fabric type (e.g., polyester vs nylon)
-- <70% = Poor match
+- 95-100% = Exact fabric percentages mentioned in title/features
+- 85-94% = Correct base fabrics mentioned (e.g., "Nylon Spandex" or "Polyamide Elastane")
+- 75-84% = Performance keywords suggesting similar blend (Moisture Wicking, Tech, Athletic, Quick Dry)
+- 60-74% = Generic athletic wear, likely similar but uncertain
+- 40-59% = Different fabric blend but same category (e.g., Polyester/Spandex vs Polyamide/Elastane)
+- 20-39% = Wrong base fabric (e.g., "100% Polyester" when searching for blends)
+- <20% = Completely different material (Cotton, Wool, etc.)
 
 Return ONLY a JSON array with this structure:
 [
-  {"index": 0, "matchPercentage": 98, "reason": "Performance + Moisture Wicking + Tech + UPF indicates polyester/elastane blend"},
-  {"index": 1, "matchPercentage": 85, "reason": "Athletic tee, likely synthetic blend"}
+  {"index": 0, "matchPercentage": 98, "reason": "Title mentions 75% Nylon 25% Spandex - exact match"},
+  {"index": 1, "matchPercentage": 35, "reason": "100% Polyester - wrong fabric, blend expected"}
 ]`
 
     const message = await anthropic.messages.create({
@@ -1728,7 +1742,7 @@ Return ONLY a JSON array with this structure:
 
     const scores = JSON.parse(responseText)
 
-    // Add match data to products and sort by match percentage
+    // Add match data to products and boost those with fabric info
     const scoredProducts = products.map((product, idx) => {
       const score = scores.find(s => s.index === idx)
 
@@ -1740,10 +1754,32 @@ Return ONLY a JSON array with this structure:
         }
       }
 
+      let matchPercentage = score?.matchPercentage || 50
+      let matchReason = score?.reason || 'Unable to determine match'
+
+      // BOOST #4: Prioritize products with actual fabric percentages in title/features
+      const titleLower = (product.title || '').toLowerCase()
+      const featuresLower = (product.features || []).join(' ').toLowerCase()
+      const combinedText = `${titleLower} ${featuresLower}`
+
+      // Check for fabric percentage patterns (e.g., "75%", "75 %", "75 percent")
+      const hasFabricPercentage = /\d+\s*%|\d+\s*percent/i.test(combinedText)
+
+      // Check for fabric names (Nylon, Polyamide, Polyester, Spandex, Elastane, Cotton)
+      const hasFabricName = /(nylon|polyamide|polyester|spandex|elastane|lycra|cotton)/i.test(combinedText)
+
+      if (hasFabricPercentage && hasFabricName) {
+        // Product explicitly lists fabric composition - boost by 10 points (capped at 100)
+        const boostedScore = Math.min(matchPercentage + 10, 100)
+        matchReason = `${matchReason} [+10 boost: fabric % in title]`
+        matchPercentage = boostedScore
+        console.log(`[Fabric Boost] "${product.title.substring(0, 50)}" boosted from ${matchPercentage - 10}% → ${boostedScore}%`)
+      }
+
       return {
         ...product,
-        matchPercentage: score?.matchPercentage || 50,
-        matchReason: score?.reason || 'Unable to determine match'
+        matchPercentage,
+        matchReason
       }
     })
 
