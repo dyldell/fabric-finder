@@ -1215,6 +1215,28 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     }
   }
 
+  // CRITICAL: Preserve important product descriptors (puffer, insulated, down, etc.)
+  // These are essential for accurate search results
+  const importantDescriptors = [
+    'puffer', 'insulated', 'down', 'quilted', 'packable',
+    'fleece', 'thermal', 'windbreaker', 'rain', 'waterproof',
+    'softshell', 'hardshell', 'vest', 'hooded', 'zip'
+  ]
+
+  let productDescriptor = ''
+  for (const descriptor of importantDescriptors) {
+    if (productName.includes(descriptor)) {
+      productDescriptor = descriptor
+      console.log(`[Search] Important descriptor detected: "${descriptor}"`)
+      break // Use first match
+    }
+  }
+
+  // Add descriptor to type if found (e.g., "jacket" → "puffer jacket")
+  if (productDescriptor) {
+    type = `${productDescriptor} ${type}`
+  }
+
   // For men's shorts, add inseam to type if available
   let typeWithInseam = type
   if (gender === 'mens' && (type === 'shorts' || type === 'short') && inseam) {
@@ -1610,6 +1632,26 @@ async function searchProductAlternativesProgressive(fabricData, brand, productTy
     if (!productName.includes('wideleg') && !productName.includes('straight') && !productName.includes('jogger')) {
       type = 'leggings'
     }
+  }
+
+  // CRITICAL: Preserve important product descriptors (same as regular search)
+  const importantDescriptors = [
+    'puffer', 'insulated', 'down', 'quilted', 'packable',
+    'fleece', 'thermal', 'windbreaker', 'rain', 'waterproof',
+    'softshell', 'hardshell', 'vest', 'hooded', 'zip'
+  ]
+
+  let productDescriptor = ''
+  for (const descriptor of importantDescriptors) {
+    if (productName.includes(descriptor)) {
+      productDescriptor = descriptor
+      console.log(`[Progressive Search] Important descriptor detected: "${descriptor}"`)
+      break
+    }
+  }
+
+  if (productDescriptor) {
+    type = `${productDescriptor} ${type}`
   }
 
   const fabricString = fabricData.fabrics
