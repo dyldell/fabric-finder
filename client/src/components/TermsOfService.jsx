@@ -36,8 +36,7 @@ export default function TermsOfService() {
 
         <section>
           <h2>4. Usage Limits</h2>
-          <p><strong>Free Users:</strong> 3 product scans per calendar month</p>
-          <p><strong>Admin Users:</strong> Unlimited scans (by invitation only)</p>
+          <p>Free users receive <strong>3 product scans per calendar month</strong>.</p>
           <p>We reserve the right to modify limits at any time. Attempts to bypass limits may result in permanent ban.</p>
         </section>
 
