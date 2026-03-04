@@ -1370,11 +1370,21 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
         return false
       }
 
-      // Exclude if contains brand-specific keywords (like "DreamKnit" for Vuori)
-      // Only exclude if keyword is capitalized/unique (likely brand-specific)
+      // Exclude ONLY truly brand-specific keywords (like "DreamKnit" for Vuori)
+      // Do NOT filter generic product terms like "Strato", "Tech", "Performance"
+      const genericTerms = ['strato', 'tech', 'performance', 'moisture', 'wicking', 'athletic', 'dry', 'fit']
+
       for (const keyword of brandKeywords) {
+        const keywordLower = keyword.toLowerCase()
+
+        // Skip if it's a generic term (not brand-specific)
+        if (genericTerms.some(term => keywordLower.includes(term))) {
+          continue
+        }
+
+        // Only exclude unique brand-specific keywords (>5 chars, capitalized, not generic)
         if (keyword.length > 5 && keyword[0] === keyword[0].toUpperCase()) {
-          if (title.includes(keyword.toLowerCase())) {
+          if (title.includes(keywordLower)) {
             return false
           }
         }
@@ -1867,6 +1877,28 @@ app.post('/api/alternatives', burstLimiter, hourlyLimiter, async (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// Clear cache endpoint (dev only)
+app.delete('/api/cache/:pattern', async (req, res) => {
+  try {
+    const pattern = req.params.pattern
+    const { data, error } = await supabase
+      .from('products_cache')
+      .delete()
+      .ilike('url', `%${pattern}%`)
+      .select()
+
+    if (error) throw error
+
+    res.json({
+      success: true,
+      deleted: data?.length || 0,
+      message: `Cleared ${data?.length || 0} cached entries matching "${pattern}"`
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
 })
 
 // ============================================================================
