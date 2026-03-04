@@ -2401,7 +2401,7 @@ app.get('/dashboard', (req, res) => {
 
   if (!isAdmin) {
     const adminUrl = process.env.NODE_ENV === 'production'
-      ? 'https://fabricfinder.fit?key=YOUR_ADMIN_KEY'
+      ? 'https://fabric-finder.onrender.com?key=YOUR_ADMIN_KEY'
       : 'http://localhost:5173?key=YOUR_ADMIN_KEY'
 
     return res.status(403).send(`
