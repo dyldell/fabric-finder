@@ -51,7 +51,7 @@ const AnalysisForm = ({ onAnalyze, loading }) => {
       <form onSubmit={handleSubmit} className="analysis-form">
         <input
           id="product-url"
-          type="url"
+          type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste any clothing URL to uncover the fabric..."
