@@ -1501,44 +1501,66 @@ async function scoreAndRankProducts(originalFabrics, products, productType) {
       features: p.features || []
     })))
 
+    const originalFabricCount = originalFabrics.length
+    const isBlend = originalFabricCount >= 2
+
     const prompt = `You are a fabric matching expert. The user is looking for products similar to one with this fabric composition:
-"${originalFabricString}"
+"${originalFabricString}" (${originalFabricCount} fabric${originalFabricCount > 1 ? 's' : ''})
 
 Product type: ${productType}
 
 Here are candidate products to rank:
 ${productsJson}
 
-CRITICAL RULE: FABRIC COMPOSITION FIRST OVER EVERYTHING!
+CRITICAL RULES - FABRIC COMPOSITION FIRST OVER EVERYTHING:
+
+${isBlend ? `
+🚨 THE ORIGINAL IS A BLEND (${originalFabricCount} fabrics) - THIS CHANGES EVERYTHING! 🚨
+
+BLEND MATCHING RULES (NON-NEGOTIABLE):
+1. **BLEND COUNT MUST MATCH** - Products with ${originalFabricCount} fabrics rank MUCH higher than single-fabric products
+2. **100% single-fabric products are BAD matches** for blends (e.g., 100% Polyester has NO stretch when original has Elastane)
+3. Elastane/Spandex/Lycra adds stretch - if original has it, alternatives MUST have it too
+4. The blend ratio matters as much as the exact percentages
+
+STRICT Scoring for BLENDS:
+- 100% = EXACT same blend (e.g., both 96% Polyester, 4% Elastane)
+- 95-99% = Very close blend (within 3-5% on each component, e.g., 90-98% Polyester, 2-10% Elastane)
+- 90-94% = Similar blend type (e.g., 88% Nylon, 12% Elastane vs 85% Polyester, 15% Spandex)
+- 70-85% = Has ${originalFabricCount} fabrics but different types OR single fabric but with keywords
+- 60-69% = Single fabric (e.g., 100% Polyester) when original is a blend - MAJOR PENALTY
+- 85% max = NO fabric data + keywords (can't verify blend)
+
+CRITICAL: A 95% Polyester, 5% Elastane blend is a MUCH better match than 100% Polyester for a 96/4 blend!
+` : `
+THE ORIGINAL IS A SINGLE FABRIC (${originalFabricString})
+
+Scoring for SINGLE FABRIC:
+- 100% = Exact same single fabric (e.g., both 100% Cotton)
+- 95-99% = Same fabric type, slightly different percentage
+- 90-94% = Similar fabric (e.g., Polyester vs Nylon)
+- 85% max = NO fabric data + keywords
+`}
 
 For each product:
-1. **FIRST** search features array for actual fabric composition (e.g., "88% Polyester, 12% Spandex", "100% Cotton", "Fabric: 90% Nylon 10% Elastane")
-2. If found, calculate EXACT fabric match and score 90-100%
-3. If NOT found, maximum score is 85% even with perfect keywords
-
-**STRICT Scoring Rules:**
-- 100% = EXACT SAME fabric (e.g., both 88% Polyester, 12% Spandex) - THESE ALWAYS WIN
-- 95-99% = Very close fabric (within 3% on each component, e.g., 85-91% Polyester, 9-15% Spandex)
-- 90-94% = Similar fabric type (e.g., 88% Polyester vs 90% Polyester)
-- 85% = NO fabric data + 3+ performance keywords (Performance, Moisture Wicking, Tech, UPF, Quick Dry, Athletic)
-- 80% = NO fabric data + 2 performance keywords
-- 75% = NO fabric data + 1 performance keyword
-- <75% = Poor match
+1. **FIRST** search features for actual fabric composition (e.g., "88% Polyester, 12% Spandex", "100% Cotton", "Fabric: 90% Nylon 10% Elastane")
+2. **COUNT the number of fabrics** in the composition
+3. Calculate match based on blend similarity, NOT just percentages
 
 **Examples of fabric data in features:**
-- "88% Polyester, 12% Spandex"
-- "Fabric: 90% Nylon 10% Elastane"
-- "Material Composition: 100% Cotton"
-- "Shell: 87% Nylon, 13% Elastane"
+- "88% Polyester, 12% Spandex" (2 fabrics - BLEND)
+- "Fabric: 90% Nylon 10% Elastane" (2 fabrics - BLEND)
+- "100% Cotton" (1 fabric - SINGLE)
+- "Shell: 87% Nylon, 13% Elastane" (2 fabrics - BLEND)
 
-Return ONLY a JSON array with this structure:
+Return ONLY a JSON array:
 [
-  {"index": 0, "matchPercentage": 100, "reason": "EXACT MATCH: 88% Polyester, 12% Spandex", "extractedFabric": "88% Polyester, 12% Spandex"},
-  {"index": 1, "matchPercentage": 95, "reason": "Very close: 90% Polyester, 10% Spandex", "extractedFabric": "90% Polyester, 10% Spandex"},
-  {"index": 2, "matchPercentage": 85, "reason": "No fabric data, but has Performance + Tech + Moisture Wicking keywords"}
+  {"index": 0, "matchPercentage": 100, "reason": "EXACT BLEND MATCH: 96% Polyester, 4% Elastane", "extractedFabric": "96% Polyester, 4% Elastane", "fabricCount": 2},
+  {"index": 1, "matchPercentage": 95, "reason": "Very close blend: 95% Polyester, 5% Spandex", "extractedFabric": "95% Polyester, 5% Spandex", "fabricCount": 2},
+  {"index": 2, "matchPercentage": 65, "reason": "PENALTY: Single fabric (100% Polyester) when original is a blend", "extractedFabric": "100% Polyester", "fabricCount": 1}
 ]
 
-CRITICAL: Products WITH extracted fabric data ALWAYS rank above products WITHOUT fabric data!`
+CRITICAL: Blend count mismatch = automatic penalty! Products WITH extracted fabric data ALWAYS rank above products WITHOUT fabric data!`
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -1561,7 +1583,8 @@ CRITICAL: Products WITH extracted fabric data ALWAYS rank above products WITHOUT
         ...product,
         matchPercentage: score?.matchPercentage || 50,
         matchReason: score?.reason || 'Unable to determine match',
-        extractedFabric: score?.extractedFabric || null
+        extractedFabric: score?.extractedFabric || null,
+        fabricCount: score?.fabricCount || 0
       }
     })
 
@@ -1581,8 +1604,8 @@ CRITICAL: Products WITH extracted fabric data ALWAYS rank above products WITHOUT
     // Log top 15 products for debugging
     console.log('\n[Top 15 Products After Scoring]:')
     scoredProducts.slice(0, 15).forEach((p, i) => {
-      const fabricInfo = p.extractedFabric ? ` | Fabric: ${p.extractedFabric}` : ''
-      console.log(`${i + 1}. [${p.matchPercentage}%] ${p.title.substring(0, 60)}...${fabricInfo} (${p.source})`)
+      const fabricInfo = p.extractedFabric ? ` | Fabric (${p.fabricCount}): ${p.extractedFabric}` : ' | No fabric data'
+      console.log(`${i + 1}. [${p.matchPercentage}%] ${p.title.substring(0, 50)}...${fabricInfo}`)
     })
     console.log('')
 
