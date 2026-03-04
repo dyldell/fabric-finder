@@ -2449,8 +2449,20 @@ if (process.env.NODE_ENV === 'production') {
   const clientDistPath = path.join(__dirname, '../client/dist')
   app.use(express.static(clientDistPath))
 
+  // Catch-all route for React Router - must be LAST
+  // Exclude API routes and dashboard
   app.get('*', (req, res) => {
+    if (req.path.startsWith('/api') || req.path === '/dashboard') {
+      return res.status(404).send('Not Found')
+    }
     res.sendFile(path.join(clientDistPath, 'index.html'))
+  })
+}
+
+// Development fallback
+if (process.env.NODE_ENV !== 'production') {
+  app.get('*', (req, res) => {
+    res.status(404).send('Not Found')
   })
 }
 
