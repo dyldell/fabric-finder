@@ -44,7 +44,7 @@ export const ALLOWED_ORIGINS = [
   'http://localhost:3000',           // Express server (for testing)
   'https://fabricfinder.fit',        // Production domain
   'https://www.fabricfinder.fit',    // Production www subdomain
-  // TODO: Add Render deployment URL when deployed (e.g., 'https://fabricfinder.onrender.com')
+  'https://fabric-finder.onrender.com' // Render deployment
 ]
 
 // ============================================================================
