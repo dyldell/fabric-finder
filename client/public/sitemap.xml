@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://fabricfinder.fit/</loc>
+    <priority>1.0</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://fabricfinder.fit/about</loc>
+    <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://fabricfinder.fit/privacy</loc>
+    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+  </url>
+  <url>
+    <loc>https://fabricfinder.fit/terms</loc>
+    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+  </url>
+</urlset>

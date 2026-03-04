@@ -40,12 +40,18 @@ function App() {
         .then(data => {
           if (data.isAdmin) {
             setIsAdmin(true)
-            console.log('✅ Admin access granted')
+            if (import.meta.env.DEV) {
+              console.log('✅ Admin access granted')
+            }
             // Remove key from URL for security
             window.history.replaceState({}, '', window.location.pathname)
           }
         })
-        .catch(err => console.error('Admin verification failed:', err))
+        .catch(err => {
+          if (import.meta.env.DEV) {
+            console.error('Admin verification failed:', err)
+          }
+        })
     } else {
       // Check existing admin session
       fetch('/api/admin/status', {
@@ -55,7 +61,9 @@ function App() {
         .then(data => {
           if (data.isAdmin) {
             setIsAdmin(true)
-            console.log('✅ Admin session active')
+            if (import.meta.env.DEV) {
+              console.log('✅ Admin session active')
+            }
           }
         })
         .catch(() => {})
@@ -129,7 +137,9 @@ function App() {
                 }
 
                 if (eventType === 'status') {
-                  console.log('Status:', data.message)
+                  if (import.meta.env.DEV) {
+                    console.log('Status:', data.message)
+                  }
                 } else if (eventType === 'fabric') {
                   fabricData = data
                   setResults({ ...data, alternatives: [] })
@@ -145,7 +155,9 @@ function App() {
                   throw new Error(data.message || 'Analysis failed')
                 }
               } catch (parseError) {
-                console.warn('Failed to parse SSE event:', parseError, dataLine)
+                if (import.meta.env.DEV) {
+                  console.warn('Failed to parse SSE event:', parseError, dataLine)
+                }
               }
               i++ // Skip the data line we just processed
             }

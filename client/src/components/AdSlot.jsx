@@ -12,7 +12,10 @@ export default function AdSlot({ isAdmin }) {
       // Load AdSense ad
       (window.adsbygoogle = window.adsbygoogle || []).push({})
     } catch (error) {
-      console.error('AdSense error:', error)
+      // Silently fail in production
+      if (import.meta.env.DEV) {
+        console.error('AdSense error:', error)
+      }
     }
   }, [])
 

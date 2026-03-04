@@ -6,9 +6,13 @@
 /**
  * Get admin secret key (checked at runtime, not import time)
  * @returns {string} - The admin secret key
+ * @throws {Error} - If ADMIN_SECRET_KEY is not configured
  */
 function getAdminSecretKey() {
-  return process.env.ADMIN_SECRET_KEY || 'change-me-in-production'
+  if (!process.env.ADMIN_SECRET_KEY) {
+    throw new Error('ADMIN_SECRET_KEY environment variable is required')
+  }
+  return process.env.ADMIN_SECRET_KEY
 }
 
 /**

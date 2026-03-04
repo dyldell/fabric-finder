@@ -1879,6 +1879,13 @@ app.get('/health', (req, res) => {
  * Sets httpOnly cookie that persists for 90 days
  */
 app.post('/api/admin/verify', adminAuthLimiter, (req, res) => {
+  // Require HTTPS in production
+  if (process.env.NODE_ENV === 'production' && !req.secure) {
+    return res.status(403).json({
+      error: 'Admin access requires HTTPS'
+    })
+  }
+
   const { key } = req.body
 
   if (!key || !isValidAdminKey(key)) {
@@ -1923,13 +1930,14 @@ app.get('/api/admin/status', (req, res) => {
  * Access: /dashboard (requires admin authentication)
  */
 app.get('/dashboard', (req, res) => {
-  console.log('[Dashboard] Route accessed')
-
   // Check if user is admin
   const isAdmin = req.cookies.admin_session === 'true'
-  console.log('[Dashboard] Admin status:', isAdmin)
 
   if (!isAdmin) {
+    const adminUrl = process.env.NODE_ENV === 'production'
+      ? 'https://fabricfinder.fit?key=YOUR_ADMIN_KEY'
+      : 'http://localhost:5173?key=YOUR_ADMIN_KEY'
+
     return res.status(403).send(`
       <!DOCTYPE html>
       <html>
@@ -1938,7 +1946,7 @@ app.get('/dashboard', (req, res) => {
         <div style="text-align: center;">
           <h1>🔒 Access Denied</h1>
           <p>This dashboard requires admin authentication.</p>
-          <a href="http://localhost:5173?key=YOUR_ADMIN_KEY" style="color: #00F5FF;">Login as Admin</a>
+          <a href="${adminUrl}" style="color: #00F5FF;">Login as Admin</a>
         </div>
       </body>
       </html>
@@ -1948,8 +1956,6 @@ app.get('/dashboard', (req, res) => {
   try {
     // Read dashboard HTML and inject environment variables
     const dashboardPath = path.join(__dirname, '../dashboard/index.html')
-    console.log('[Dashboard] Reading from:', dashboardPath)
-
     let html = fs.readFileSync(dashboardPath, 'utf8')
 
     // Replace hardcoded credentials with environment variables
@@ -1962,12 +1968,13 @@ app.get('/dashboard', (req, res) => {
       `const SUPABASE_ANON_KEY = '${process.env.SUPABASE_ANON_KEY}'`
     )
 
-    console.log('[Dashboard] Successfully injected environment variables')
-
     res.setHeader('Content-Type', 'text/html')
     res.send(html)
   } catch (error) {
-    console.error('[Dashboard] Error:', error)
+    // Log errors only in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Dashboard] Error:', error)
+    }
     res.status(500).send('Error loading dashboard')
   }
 })

@@ -720,6 +720,11 @@
     const SUPABASE_URL = 'INJECTED_BY_SERVER'
     const SUPABASE_ANON_KEY = 'INJECTED_BY_SERVER'
 
+    // Validate injection worked
+    if (SUPABASE_URL === 'INJECTED_BY_SERVER' || SUPABASE_ANON_KEY === 'INJECTED_BY_SERVER') {
+      throw new Error('Dashboard environment variables not injected by server')
+    }
+
     // Import Supabase client (CDN)
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
