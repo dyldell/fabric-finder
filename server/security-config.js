@@ -161,20 +161,8 @@ export function isValidScrapeUrl(url) {
     }
   }
 
-  // Step 5: Check domain against allowlist
-  const isAllowedDomain = ALLOWED_DOMAINS.some(domain => {
-    // Match exact domain or subdomain (e.g., shop.lululemon.com matches lululemon.com)
-    return hostname === domain || hostname.endsWith('.' + domain)
-  })
-
-  if (!isAllowedDomain) {
-    return {
-      valid: false,
-      error: `This website is not currently supported. Supported brands: ${ALLOWED_DOMAINS.slice(0, 5).join(', ')}, and more.`
-    }
-  }
-
-  // Step 6: All checks passed
+  // Step 5: All SSRF checks passed - allow any legitimate clothing website
+  // No brand whitelist - works with ANY brand!
   return {
     valid: true,
     error: null

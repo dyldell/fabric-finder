@@ -64,6 +64,9 @@ const PRODUCT_URLS = {
     'https://skims.com/products/fits-everybody-high-waist-legging-onyx',
     'https://skims.com/products/soft-lounge-long-slip-dress-onyx',
     'https://skims.com/products/cotton-rib-tank-onyx',
+    'https://skims.com/products/seamless-sculpt-brief-bodysuit-onyx',
+    'https://skims.com/products/everyday-sculpt-bodysuit-onyx',
+    'https://skims.com/products/seamless-sculpt-thong-bodysuit-onyx',
   ],
   csb: [
     'https://www.shopcsb.com/products/serenity-crossover-leggings-navy',
@@ -71,6 +74,13 @@ const PRODUCT_URLS = {
     'https://www.shopcsb.com/products/serenity-crossover-4-inch-shorts-navy',
     'https://www.shopcsb.com/products/serenity-elsie-tank-navy',
     'https://www.shopcsb.com/products/off-shoulder-wrap-top-navy',
+  ],
+  patagonia: [
+    'https://www.patagonia.com/product/womens-capilene-midweight-baselayer-bottoms/44492.html',
+    'https://www.patagonia.com/product/womens-capilene-thermal-weight-baselayer-bottoms/43692.html',
+    'https://www.patagonia.com/product/womens-capilene-cool-daily-hoody/45316.html',
+    'https://www.patagonia.com/product/womens-capilene-cool-daily-shirt/45226.html',
+    'https://www.patagonia.com/product/womens-capilene-thermal-weight-boot-length-baselayer-bottoms/43695.html',
   ],
 }
 
@@ -92,6 +102,7 @@ function extractBrand(url) {
     'vuoriclothing.com': 'Vuori',
     'skims.com': 'Skims',
     'shopcsb.com': 'CSB',
+    'patagonia.com': 'Patagonia',
   }
 
   for (const [domain, brand] of Object.entries(brandMap)) {
@@ -427,7 +438,7 @@ async function batchScrape(options = {}) {
 // Parse CLI arguments
 const args = process.argv.slice(2)
 const options = {
-  brands: ['lululemon', 'alo', 'vuori', 'skims', 'csb'],
+  brands: ['lululemon', 'alo', 'vuori', 'skims', 'csb', 'patagonia'],
   limit: null,
   skipCached: true
 }

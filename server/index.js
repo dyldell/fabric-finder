@@ -526,13 +526,75 @@ async function saveToCache(url, fabricData) {
   }
 }
 
+// Try simple HTTP fetch first (cheap, fast)
+async function scrapeWithSimpleFetch(url) {
+  console.log(`[Simple Fetch] Attempting basic scrape: ${url}`)
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      timeout: 10000
+    })
+
+    // Check for bot protection or errors
+    if (!response.ok) {
+      console.log(`[Simple Fetch] Failed: ${response.status} ${response.statusText}`)
+      return { success: false, needsFirecrawl: true }
+    }
+
+    const html = await response.text()
+
+    // Check for common bot protection signatures
+    const botProtectionSignatures = [
+      'cloudflare',
+      'please enable javascript',
+      'checking your browser',
+      'access denied',
+      'captcha',
+      'are you a robot'
+    ]
+
+    const htmlLower = html.toLowerCase()
+    const hasBotProtection = botProtectionSignatures.some(sig => htmlLower.includes(sig))
+
+    if (hasBotProtection || html.length < 500) {
+      console.log(`[Simple Fetch] Bot protection detected or page too small`)
+      return { success: false, needsFirecrawl: true }
+    }
+
+    console.log(`[Simple Fetch] Success - ${html.length} chars`)
+    return {
+      success: true,
+      content: html,
+      url
+    }
+  } catch (error) {
+    console.log(`[Simple Fetch] Error: ${error.message}`)
+    return { success: false, needsFirecrawl: true }
+  }
+}
+
 // Improved Firecrawl scraping with better error handling
 async function scrapeWithFirecrawl(url) {
   console.log(`[Firecrawl] Scraping URL: ${url}`)
 
   // Detect if URL needs special JSON extraction (Alo Yoga, Lululemon, Gymshark)
   const useJsonExtraction = url.includes('aloyoga.com') || url.includes('lululemon.com') || url.includes('gymshark.com')
-  const needsStealth = useJsonExtraction || url.includes('patagonia.com') || url.includes('abercrombie.com')
+
+  // Known easy brands that don't need stealth
+  const easyBrands = ['vuoriclothing.com', 'shopcsb.com']
+  const isEasyBrand = easyBrands.some(brand => url.includes(brand))
+
+  // Use stealth mode by default for all brands EXCEPT known easy ones
+  // This allows any brand to work, even unknown ones
+  const needsStealth = !isEasyBrand
 
   try {
     // For Alo Yoga, Lululemon, and Gymshark, use JSON extraction instead of markdown
@@ -848,32 +910,48 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanL
       })
     }
 
-    // Step 2: Scrape with Firecrawl
+    // Step 2: Two-tier scraping - try simple fetch first, fallback to Firecrawl
     console.log('[Scraping] Fresh scrape from source')
-    const firecrawlStart = Date.now()
-    const scrapedData = await scrapeWithFirecrawl(url)
-    const firecrawlTime = Date.now() - firecrawlStart
+    let scrapedData
+    let usedFirecrawl = false
 
-    if (!scrapedData.success) {
-      // Track failed Firecrawl call
+    // Tier 1: Try simple HTTP fetch (cheap)
+    const simpleFetchStart = Date.now()
+    const simpleFetchResult = await scrapeWithSimpleFetch(url)
+    const simpleFetchTime = Date.now() - simpleFetchStart
+
+    if (simpleFetchResult.success) {
+      console.log('[Scraping] Simple fetch succeeded - no Firecrawl needed!')
+      scrapedData = simpleFetchResult
+    } else {
+      // Tier 2: Fallback to Firecrawl stealth (expensive)
+      console.log('[Scraping] Simple fetch failed - using Firecrawl stealth')
+      const firecrawlStart = Date.now()
+      scrapedData = await scrapeWithFirecrawl(url)
+      const firecrawlTime = Date.now() - firecrawlStart
+      usedFirecrawl = true
+
+      if (!scrapedData.success) {
+        // Track failed Firecrawl call
+        await trackApiCall('firecrawl', {
+          scanUrl: url,
+          responseTime: firecrawlTime,
+          status: 'error'
+        })
+        clearTimeout(requestTimeout)
+        return res.status(500).json({
+          error: sanitizeError('Failed to scrape product page')
+        })
+      }
+
+      // Track successful Firecrawl call
       await trackApiCall('firecrawl', {
         scanUrl: url,
         responseTime: firecrawlTime,
-        status: 'error'
+        status: 'success'
       })
-      clearTimeout(requestTimeout)
-      return res.status(500).json({
-        error: sanitizeError('Failed to scrape product page')
-      })
+      apiCallTracker.firecrawl = 1
     }
-
-    // Track successful Firecrawl call
-    await trackApiCall('firecrawl', {
-      scanUrl: url,
-      responseTime: firecrawlTime,
-      status: 'success'
-    })
-    apiCallTracker.firecrawl = 1
 
     // Step 3: Extract fabric composition
     let fabricData
@@ -2321,24 +2399,38 @@ app.post('/api/analyze-stream', checkCostLimit, burstLimiter, hourlyLimiter, che
       return
     }
 
-    // Step 2: Scrape with Firecrawl
+    // Step 2: Two-tier scraping - try simple fetch first, fallback to Firecrawl
     sendEvent('status', { step: 'scrape', message: 'Scraping product page...' })
-    const firecrawlStart = Date.now()
-    const scrapedData = await scrapeWithFirecrawl(url)
-    const firecrawlTime = Date.now() - firecrawlStart
+    let scrapedData
+    let usedFirecrawl = false
 
-    if (!scrapedData.success) {
-      sendEvent('error', { message: sanitizeError('Failed to scrape product page') })
-      clearTimeout(requestTimeout)
-      res.end()
-      return
+    // Tier 1: Try simple HTTP fetch (cheap)
+    const simpleFetchResult = await scrapeWithSimpleFetch(url)
+
+    if (simpleFetchResult.success) {
+      console.log('[Scraping] Simple fetch succeeded - no Firecrawl needed!')
+      scrapedData = simpleFetchResult
+    } else {
+      // Tier 2: Fallback to Firecrawl stealth (expensive)
+      console.log('[Scraping] Simple fetch failed - using Firecrawl stealth')
+      const firecrawlStart = Date.now()
+      scrapedData = await scrapeWithFirecrawl(url)
+      const firecrawlTime = Date.now() - firecrawlStart
+      usedFirecrawl = true
+
+      if (!scrapedData.success) {
+        sendEvent('error', { message: sanitizeError('Failed to scrape product page') })
+        clearTimeout(requestTimeout)
+        res.end()
+        return
+      }
+
+      await trackApiCall('firecrawl', {
+        scanUrl: url,
+        responseTime: firecrawlTime,
+        status: 'success'
+      })
     }
-
-    await trackApiCall('firecrawl', {
-      scanUrl: url,
-      responseTime: firecrawlTime,
-      status: 'success'
-    })
 
     // Step 3: Extract fabric composition (with streaming!)
     let fabricData
