@@ -21,6 +21,7 @@ export const ALLOWED_DOMAINS = [
   'adidas.com',
   'underarmour.com',
   'skims.com',
+  'shopcsb.com',
   'abercrombie.com',
 
   // Outdoor Brands

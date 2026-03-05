@@ -65,6 +65,13 @@ const PRODUCT_URLS = {
     'https://skims.com/products/soft-lounge-long-slip-dress-onyx',
     'https://skims.com/products/cotton-rib-tank-onyx',
   ],
+  csb: [
+    'https://www.shopcsb.com/products/serenity-crossover-leggings-navy',
+    'https://www.shopcsb.com/products/serenity-naomi-crop-navy',
+    'https://www.shopcsb.com/products/serenity-crossover-4-inch-shorts-navy',
+    'https://www.shopcsb.com/products/serenity-elsie-tank-navy',
+    'https://www.shopcsb.com/products/off-shoulder-wrap-top-navy',
+  ],
 }
 
 // Utility: Normalize URL
@@ -84,6 +91,7 @@ function extractBrand(url) {
     'aloyoga.com': 'Alo Yoga',
     'vuoriclothing.com': 'Vuori',
     'skims.com': 'Skims',
+    'shopcsb.com': 'CSB',
   }
 
   for (const [domain, brand] of Object.entries(brandMap)) {
@@ -295,7 +303,6 @@ async function saveToCache(url, fabricData) {
         fabrics: fabricData.fabrics || [],
         quality_tier: fabricData.quality_tier,
         features: fabricData.features || [],
-        keywords: fabricData.keywords || [],
         scraped_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString(),
         scrape_success: true,
@@ -420,7 +427,7 @@ async function batchScrape(options = {}) {
 // Parse CLI arguments
 const args = process.argv.slice(2)
 const options = {
-  brands: ['lululemon', 'alo', 'vuori', 'skims'],
+  brands: ['lululemon', 'alo', 'vuori', 'skims', 'csb'],
   limit: null,
   skipCached: true
 }

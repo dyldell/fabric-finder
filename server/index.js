@@ -413,6 +413,7 @@ function extractBrand(url) {
     'aloyoga.com': 'Alo Yoga',
     'patagonia.com': 'Patagonia',
     'skims.com': 'Skims',
+    'shopcsb.com': 'CSB',
     'outdoorvoices.com': 'Outdoor Voices',
     'beyondyoga.com': 'Beyond Yoga',
     'sweatybetty.com': 'Sweaty Betty',
