@@ -1675,6 +1675,30 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     console.log(`[Filter] Removed ${beforeFilter - rankedProducts.length} dress/formal shirts`)
   }
 
+  // Filter out wrong gender products (e.g., women's products when searching for men's)
+  const originalGender = (fabricData.gender || '').toLowerCase()
+  if (originalGender === 'mens' || originalGender === 'men') {
+    const beforeGenderFilter = rankedProducts.length
+    rankedProducts = rankedProducts.filter(product => {
+      const titleLower = (product.title || '').toLowerCase()
+      // Exclude if contains "women" or "womens" or "ladies"
+      return !(titleLower.includes('women') || titleLower.includes('womens') || titleLower.includes('ladies') || titleLower.includes('girls'))
+    })
+    if (beforeGenderFilter > rankedProducts.length) {
+      console.log(`[Filter] Removed ${beforeGenderFilter - rankedProducts.length} women's products (searching for men's)`)
+    }
+  } else if (originalGender === 'womens' || originalGender === 'women') {
+    const beforeGenderFilter = rankedProducts.length
+    rankedProducts = rankedProducts.filter(product => {
+      const titleLower = (product.title || '').toLowerCase()
+      // Exclude if contains "men" (but not "women")
+      return !(titleLower.includes('men\'s') || titleLower.includes('mens') || (titleLower.includes(' men ') && !titleLower.includes('women')))
+    })
+    if (beforeGenderFilter > rankedProducts.length) {
+      console.log(`[Filter] Removed ${beforeGenderFilter - rankedProducts.length} men's products (searching for women's)`)
+    }
+  }
+
   // Filter out the original brand and brand-specific keywords
   if (brand) {
     const originalCount = rankedProducts.length
