@@ -585,8 +585,8 @@ async function scrapeWithSimpleFetch(url) {
 async function scrapeWithFirecrawl(url) {
   console.log(`[Firecrawl] Scraping URL: ${url}`)
 
-  // Detect if URL needs special JSON extraction (Alo Yoga, Lululemon, Gymshark)
-  const useJsonExtraction = url.includes('aloyoga.com') || url.includes('lululemon.com') || url.includes('gymshark.com')
+  // Detect if URL needs special JSON extraction (Alo Yoga, Lululemon, Gymshark, Patagonia)
+  const useJsonExtraction = url.includes('aloyoga.com') || url.includes('lululemon.com') || url.includes('gymshark.com') || url.includes('patagonia.com')
 
   // Known easy brands that don't need stealth
   const easyBrands = ['vuoriclothing.com', 'shopcsb.com']
@@ -597,9 +597,12 @@ async function scrapeWithFirecrawl(url) {
   const needsStealth = !isEasyBrand
 
   try {
-    // For Alo Yoga, Lululemon, and Gymshark, use JSON extraction instead of markdown
+    // For Alo Yoga, Lululemon, Gymshark, and Patagonia, use JSON extraction instead of markdown
     if (useJsonExtraction) {
-      const brand = url.includes('aloyoga.com') ? 'Alo Yoga' : url.includes('gymshark.com') ? 'Gymshark' : 'Lululemon'
+      const brand = url.includes('aloyoga.com') ? 'Alo Yoga' :
+                    url.includes('gymshark.com') ? 'Gymshark' :
+                    url.includes('patagonia.com') ? 'Patagonia' :
+                    'Lululemon'
       console.log(`[Firecrawl] Using JSON extraction for ${brand}`)
 
       const scrapeOptions = {
