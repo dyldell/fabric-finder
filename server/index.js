@@ -1002,14 +1002,14 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanL
     )
     const searchTime = Date.now() - searchStart
 
-    // Track SerpAPI calls (4 total: 2 Amazon + 2 Google Shopping, reduced from 5)
+    // Track SerpAPI calls (2 total: 1 Amazon + 1 Google Shopping - OPTIMIZED from 5)
     await trackApiCall('serpapi', {
       scanUrl: url,
-      callCount: 4,
+      callCount: 2,
       responseTime: searchTime,
       status: 'success'
     })
-    apiCallTracker.serpapi = 4
+    apiCallTracker.serpapi = 2
 
     // Track Claude scoring call (happens inside searchProductAlternatives)
     await trackApiCall('claude', {
@@ -1065,7 +1065,7 @@ app.post('/api/analyze', checkCostLimit, burstLimiter, hourlyLimiter, checkScanL
 })
 
 // Search for real product alternatives using SerpAPI (keep for Google Shopping results)
-async function searchSerpApiProducts(fabricData, brand, productType = 'athletic wear', customQuery = null) {
+async function searchSerpApiProducts(fabricData, brand, productType = 'athletic wear', customQuery = null, resultCount = 10) {
   const serpApiKey = process.env.SERP_API_KEY
   const associateTag = process.env.AMAZON_ASSOCIATE_TAG
 
@@ -1119,7 +1119,7 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
       }
     }
 
-    console.log(`[SerpAPI] Searching: "${searchQuery}"`)
+    console.log(`[SerpAPI] Searching: "${searchQuery}" (limit: ${resultCount})`)
 
     // Call SerpAPI Google Shopping
     const search = new SerpApi.GoogleSearch(serpApiKey)
@@ -1128,7 +1128,7 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
       search.json({
         engine: 'google_shopping',
         q: searchQuery,
-        num: 10, // Get top 10 results per query
+        num: Math.min(resultCount, 20), // SerpAPI max is 20 per request
         gl: 'us', // United States
         hl: 'en', // English
       }, (data) => {
@@ -1171,8 +1171,8 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
       console.log(`[SerpAPI] Filtered ${results.shopping_results.length} → ${filteredResults.length} products (excluded: ${exclusions.join(', ')})`)
     }
 
-    // Transform SerpAPI results into our format (get top 10 after filtering)
-    return filteredResults.slice(0, 10).map(product => {
+    // Transform SerpAPI results into our format (get top N after filtering)
+    return filteredResults.slice(0, resultCount).map(product => {
       // Add Amazon affiliate tag if it's an Amazon product
       let productUrl = product.product_link || product.link || '#'
       if (productUrl && productUrl.includes('amazon.com') && associateTag) {
@@ -1205,7 +1205,7 @@ async function searchSerpApiProducts(fabricData, brand, productType = 'athletic 
 }
 
 // Search Amazon directly using SerpAPI (no Creator API needed!)
-async function searchAmazonViaSerpApi(fabricData, brand, productType = 'athletic wear', customQuery = null) {
+async function searchAmazonViaSerpApi(fabricData, brand, productType = 'athletic wear', customQuery = null, resultCount = 10) {
   const serpApiKey = process.env.SERP_API_KEY
   const associateTag = process.env.AMAZON_ASSOCIATE_TAG || 'fabricfinder-20'
 
@@ -1228,7 +1228,7 @@ async function searchAmazonViaSerpApi(fabricData, brand, productType = 'athletic
         : `${type} ${fabricString}`
     })()
 
-    console.log(`[SerpAPI Amazon] Searching: "${searchQuery}"`)
+    console.log(`[SerpAPI Amazon] Searching: "${searchQuery}" (limit: ${resultCount})`)
 
     const search = new SerpApi.GoogleSearch(serpApiKey)
 
@@ -1251,7 +1251,7 @@ async function searchAmazonViaSerpApi(fabricData, brand, productType = 'athletic
     console.log(`[SerpAPI Amazon] Found ${results.organic_results.length} Amazon products`)
 
     // Transform Amazon results
-    return results.organic_results.slice(0, 10).map(product => {
+    return results.organic_results.slice(0, resultCount).map(product => {
       // Add affiliate tag to Amazon URL
       let productUrl = product.link || '#'
       if (productUrl.includes('amazon.com')) {
@@ -1383,67 +1383,45 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
 
   const keywordString = keywords.join(' ')
 
-  // Build 2 optimized search queries (reduced from 3 to save API costs)
-  const queries = []
-
-  // Query 1: Fabric-based exact match (with inseam for men's shorts)
-  queries.push({
-    name: 'fabric-exact',
-    query: gender && typeWithInseam
-      ? `${gender} ${typeWithInseam} ${fabricString}`
-      : `${typeWithInseam} ${fabricString}`
-  })
-
-  // Query 2: Keyword-based OR budget search (pick best one)
-  if (keywordString) {
-    // If we have keywords, use keyword search (better quality)
-    queries.push({
-      name: 'keyword',
-      query: gender && typeWithInseam
-        ? `${gender} ${typeWithInseam} ${keywordString}`
-        : `${typeWithInseam} ${keywordString}`
-    })
-  } else {
-    // No keywords? Fall back to budget search
-    queries.push({
-      name: 'budget',
-      query: gender && typeWithInseam
-        ? `budget ${gender} ${typeWithInseam} athletic`
-        : `budget ${typeWithInseam} athletic`
-    })
-  }
-
   // EXCLUSION KEYWORDS: Block dress/formal wear (athletic wear only)
   const exclusions = '-dress -button -oxford -formal -casual -flannel'
 
-  // NEW Query 3: Amazon-specific fabric percentage search (prioritize exact matches)
+  // OPTIMIZED 3-QUERY STRATEGY (reduced from 6 queries to save 8-10 seconds)
+  // Query 1: Amazon SerpAPI - Fabric-specific with exact percentages (20 results)
   const amazonFabricQuery = gender && typeWithInseam
     ? `${fabricString} ${gender} ${typeWithInseam} performance ${exclusions}`
     : `${fabricString} ${typeWithInseam} performance ${exclusions}`
 
-  console.log(`[Search] Running searches: Amazon PAAPI + Amazon SerpAPI (3 queries) + Google Shopping (2 queries) - FABRIC OPTIMIZED`)
+  // Query 2: Google Shopping - Keyword-based or budget search (20 results)
+  let googleShoppingQuery = ''
+  if (keywordString) {
+    // If we have keywords, use keyword search (better quality)
+    googleShoppingQuery = gender && typeWithInseam
+      ? `${gender} ${typeWithInseam} ${keywordString} ${exclusions}`
+      : `${typeWithInseam} ${keywordString} ${exclusions}`
+  } else {
+    // No keywords? Fall back to fabric-based search with "budget"
+    googleShoppingQuery = gender && typeWithInseam
+      ? `budget ${gender} ${typeWithInseam} ${fabricString} ${exclusions}`
+      : `budget ${typeWithInseam} ${fabricString} ${exclusions}`
+  }
 
-  // Run queries in parallel: Amazon PAAPI + Amazon SerpAPI (3 queries) + Google Shopping SerpAPI (2 queries)
-  // NEW: Added third Amazon query specifically for fabric percentages
-  const fabricExactQuery = queries.find(q => q.name === 'fabric-exact')
-  const secondQuery = queries.find(q => q.name === 'keyword') || queries.find(q => q.name === 'budget')
+  console.log(`[Search] OPTIMIZED: Amazon PAAPI + Amazon SerpAPI (1 query) + Google Shopping (1 query)`)
+  console.log(`[Search] Amazon query: "${amazonFabricQuery}"`)
+  console.log(`[Search] Google query: "${googleShoppingQuery}"`)
 
-  const [amazonPaapiResults, amazonSerpFabric, amazonSerpExact, amazonSerpSecond, ...googleShoppingResults] = await Promise.all([
-    searchAmazonProducts(fabricData, brand, productType),
-    searchAmazonViaSerpApi(fabricData, brand, productType, amazonFabricQuery),
-    searchAmazonViaSerpApi(fabricData, brand, productType, `${fabricExactQuery?.query || `${gender} ${typeWithInseam} athletic`} ${exclusions}`),
-    searchAmazonViaSerpApi(fabricData, brand, productType, `${secondQuery?.query || `budget ${typeWithInseam} athletic`} ${exclusions}`),
-    ...queries.map(q => searchSerpApiProducts(fabricData, brand, productType, `${q.query} ${exclusions}`))
+  // Run 3 queries in parallel: Amazon PAAPI (10) + Amazon SerpAPI (20) + Google Shopping (20) = 50 total products
+  const [amazonPaapiResults, amazonSerpResults, googleShoppingResults] = await Promise.all([
+    searchAmazonProducts(fabricData, brand, productType), // 10 results
+    searchAmazonViaSerpApi(fabricData, brand, productType, amazonFabricQuery, 20), // 20 results
+    searchSerpApiProducts(fabricData, brand, productType, googleShoppingQuery, 20) // 20 results
   ])
 
-  // Combine all Amazon results (PAAPI + SerpAPI x3)
-  const allAmazonResults = [...amazonPaapiResults, ...amazonSerpFabric, ...amazonSerpExact, ...amazonSerpSecond]
-
-  // Flatten Google Shopping results
-  const allGoogleShoppingResults = googleShoppingResults.flat()
+  // Combine all results (Amazon PAAPI + Amazon SerpAPI + Google Shopping)
+  const allAmazonResults = [...amazonPaapiResults, ...amazonSerpResults]
 
   // Combine everything
-  let allResults = [...allAmazonResults, ...allGoogleShoppingResults]
+  let allResults = [...allAmazonResults, ...googleShoppingResults]
 
   // HARDCODED ODODOS DUPES: 15 Vuori products mapped to exact ODODOS alternatives
   // These are guaranteed 100% or 99% matches that always show first
