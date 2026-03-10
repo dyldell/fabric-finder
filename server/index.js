@@ -1617,7 +1617,7 @@ async function searchProductAlternatives(fabricData, brand, productType = 'athle
     return generateFallbackAlternatives(fabricData, brand, productType)
   }
 
-  console.log(`[Search] Found ${allAmazonResults.length} Amazon + ${allGoogleShoppingResults.length} Google Shopping = ${allResults.length} total → ${allProducts.length} unique products after deduplication`)
+  console.log(`[Search] Found ${allAmazonResults.length} Amazon + ${googleShoppingResults.length} Google Shopping = ${allResults.length} total → ${allProducts.length} unique products after deduplication`)
 
   // Use Claude to score and rank all products by fabric match
   let rankedProducts = await scoreAndRankProducts(
