@@ -21,7 +21,8 @@ CREATE INDEX IF NOT EXISTS idx_api_tracking_api_name ON api_tracking(api_name);
 CREATE INDEX IF NOT EXISTS idx_api_tracking_status ON api_tracking(status);
 
 -- Daily totals view (aggregated for performance)
-CREATE OR REPLACE VIEW daily_totals AS
+-- SECURITY INVOKER = runs with caller's privileges (not definer's)
+CREATE OR REPLACE VIEW daily_totals WITH (security_invoker=true) AS
 SELECT
   DATE(created_at) as date,
   api_name,
@@ -37,7 +38,8 @@ GROUP BY DATE(created_at), api_name
 ORDER BY date DESC, api_name;
 
 -- Monthly totals view
-CREATE OR REPLACE VIEW monthly_totals AS
+-- SECURITY INVOKER = runs with caller's privileges (not definer's)
+CREATE OR REPLACE VIEW monthly_totals WITH (security_invoker=true) AS
 SELECT
   DATE_TRUNC('month', created_at) as month,
   api_name,
@@ -62,9 +64,14 @@ CREATE POLICY "Authenticated users can read" ON api_tracking
   FOR SELECT
   USING (auth.role() = 'authenticated' OR auth.role() = 'anon');
 
--- Grant permissions
-GRANT SELECT ON daily_totals TO authenticated, anon;
-GRANT SELECT ON monthly_totals TO authenticated, anon;
+-- Grant permissions (ONLY to service_role for security)
+-- Remove anon access to prevent exposing API usage data publicly
+REVOKE ALL ON daily_totals FROM anon;
+REVOKE ALL ON monthly_totals FROM anon;
+
+-- Only allow authenticated users (dashboard admins)
+GRANT SELECT ON daily_totals TO authenticated;
+GRANT SELECT ON monthly_totals TO authenticated;
 
 -- Create function to get today's stats (faster than view for dashboard)
 CREATE OR REPLACE FUNCTION get_todays_stats()
